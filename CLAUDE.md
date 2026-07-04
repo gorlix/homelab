@@ -41,6 +41,9 @@ Tutti e 3 su **Proxmox VE**.
 - Authentik (SSO centralizzato)
 - Monitoring infrastruttura
 - Nodi Kubernetes (work in progress)
+- Traefik (reverse proxy della Region B)
+- Cloudflare Tunnel (ad-hoc per la Region B)
+- Tailscale (nodo di interconnessione con la Region A)
 
 ## Stack tecnologico deciso
 
@@ -102,6 +105,8 @@ homelab/
 
 **Segreti:** nessun valore in chiaro nel repo. Solo riferimenti `op://vault/item/field` risolti a runtime con 1Password CLI/Connect. Gitleaks in pre-commit e CI come rete di sicurezza aggiuntiva. Attenzione anche a segreti "impliciti": IP pubblici, MAC address, coordinate GPS in config Home Assistant, serial number nei log — vanno sanitizzati a mano.
 
+**Niente emoji nella documentazione.** README, ADR, note del vault e diagrammi non usano emoji decorative (né nei titoli né nelle tabelle di stato): testo semplice, più professionale e stabile per anchor e rendering. Le frecce tipografiche (`→`, `↔`) e i simboli tecnici non sono emoji e restano ammessi.
+
 ## Domande aperte / decisioni non ancora prese
 
 - `adguardhome-sync`: modalità cron o webhook? (da decidere)
@@ -110,12 +115,12 @@ homelab/
 
 ## Roadmap (fasi)
 
-1. ✅ Documentazione architetturale e primi ADR
-2. ⬜ Docker Compose versionato e sanitizzato per tutti i servizi + MkDocs/Pages
-3. ⬜ Ansible playbook per i 3 nodi
-4. ⬜ OpenTofu per provisioning Proxmox
-5. ⬜ Migrazione secret management su 1Password Connect
-6. ⬜ Cluster k8s gestito in GitOps con Flux
+1. **Fatto** — Documentazione architetturale e primi ADR
+2. **Da fare** — Docker Compose versionato e sanitizzato per tutti i servizi + MkDocs/Pages
+3. **Da fare** — Ansible playbook per i 3 nodi
+4. **Da fare** — OpenTofu per provisioning Proxmox
+5. **Da fare** — Migrazione secret management su 1Password Connect
+6. **Da fare** — Cluster k8s gestito in GitOps con Flux
 
 ## Tono e stile richiesti nella documentazione
 

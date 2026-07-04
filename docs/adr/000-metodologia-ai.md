@@ -14,7 +14,7 @@ date: 2026
 
 | | |
 |---|---|
-| **Stato** | ✅ Accettato |
+| **Stato** | Accettato |
 | **Data** | 2026 |
 | **Tipo** | Meta-ADR (processo, non infrastruttura) |
 

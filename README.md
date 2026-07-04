@@ -7,7 +7,7 @@ tags:
   - overview
 ---
 
-# 🏠 Homelab
+# Homelab
 
 > Documentazione e Infrastructure-as-Code del mio homelab personale: automazione domestica, servizi self-hosted, sperimentazione Kubernetes.
 
@@ -18,7 +18,7 @@ tags:
 
 ---
 
-## 📖 Indice
+## Indice
 
 - [Panoramica](#panoramica)
 - [Hardware](#hardware)
@@ -46,9 +46,9 @@ L'obiettivo del repo non è solo mostrare delle configurazioni, ma raccontare **
 
 | Nodo | Sito | CPU | Ruolo |
 |---|---|---|---|
-| **dell-emc** | 🏢 Ditta | 16 × Intel Xeon Silver 4110 @ 2.10GHz | Nodo principale: servizi in produzione, sperimentazione, k8s (WIP) |
-| **hp-laptop** | 🏠 Casa | 4 × Intel Core i5-6200U @ 2.30GHz | Hub domotico + edge: sempre acceso, basso consumo, networking |
-| **thinkcentre** | 🏠 Casa | 4 × Intel Core i3-4130 @ 3.40GHz | Videosorveglianza (Frigate) + failover DNS |
+| **dell-emc** | Ditta | 16 × Intel Xeon Silver 4110 @ 2.10GHz | Nodo principale: servizi in produzione, sperimentazione, k8s (WIP) |
+| **hp-laptop** | Casa | 4 × Intel Core i5-6200U @ 2.30GHz | Hub domotico + edge: sempre acceso, basso consumo, networking |
+| **thinkcentre** | Casa | 4 × Intel Core i3-4130 @ 3.40GHz | Videosorveglianza (Frigate) + failover DNS |
 
 Tutti e 3 i nodi eseguono **Proxmox VE**: `hp-laptop` e `thinkcentre` in **cluster** sulla LAN di casa, `dell-emc` **standalone** nel sito remoto. Dettagli sulla topologia multi-sito in [ADR-005](docs/adr/005-topologia-multi-sito.md).
 

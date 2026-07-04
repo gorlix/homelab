@@ -19,7 +19,7 @@ related:
 
 | | |
 |---|---|
-| **Stato** | ✅ Accettato — in produzione |
+| **Stato** | Accettato — in produzione |
 | **Data** | 2026 |
 | **Nodi coinvolti** | `hp-laptop` (primario), `thinkcentre` (backup) |
 
