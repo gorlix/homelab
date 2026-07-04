@@ -132,6 +132,9 @@ flowchart TB
 **DNS:** AdGuard Home gira in coppia primario/backup (`hp-laptop` / `thinkcentre`) con IP virtuale condiviso, interamente dentro la LAN di casa — il failover VRRP sfrutta la stessa rete fisica. Dettagli in [ADR-001](docs/adr/001-adguard-ha-failover.md).
 
 **Backup Home Assistant:** essendo il componente di punta dell'homelab, l'hub domotico è ridondato più di ogni altro servizio, con una logica **3-2-1** su destinazioni multiple — **Cloudflare R2** (2 copie: una *milestone* e una giornaliera), **Google Drive** (4 copie: milestone, alcune giornaliere e copie parziali del solo database Zigbee) e una **copia locale** sul dispositivo. Backup completi *milestone* per i ripristini importanti, giornalieri per il recupero rapido, parziali Zigbee per rimettere in piedi in fretta la sola rete dei dispositivi.
+
+> [!NOTE] Perché sparpagliati su più servizi?
+> Diciamocelo francamente: distribuire le copie su provider diversi serve anche a **spremere i piani gratuiti** di ciascuno. Cloudflare R2 non fa pagare l'egress, Google Drive regala qualche giga — spalmare i backup tiene la bolletta a zero e, come effetto collaterale niente male, aggiunge *vera* ridondanza tra fornitori indipendenti. Taccagneria e resilienza che per una volta vanno d'accordo. 🐿️
 > La Region B gira su un'infrastruttura di rete **non sotto il mio controllo diretto** (firewall e VLAN gestiti dall'azienda che amministra l'infra aziendale). È un vincolo reale che ha guidato diverse scelte — tunnel in uscita invece di port forwarding, nessuna dipendenza da regole firewall che non controllo. Approfondito in [ADR-005](docs/adr/005-topologia-multi-sito.md).
 
 ## Stack tecnologico
