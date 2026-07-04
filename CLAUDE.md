@@ -25,7 +25,7 @@ Tutti e 3 su **Proxmox VE**.
 ## Servizi attuali per nodo
 
 **hp-laptop**
-- Home Assistant (hub domotica — componente di punta, da documentare con cura)
+- Home Assistant (hub domotica — componente di punta, da documentare con cura). Backup 3-2-1 multi-destinazione: Cloudflare R2 (2 copie: milestone + daily), Google Drive (4 copie: milestone, daily, parziali solo-Zigbee), copia locale sul dispositivo
 - Traefik (reverse proxy)
 - Tailscale
 - AdGuard Home (istanza primaria/origin)

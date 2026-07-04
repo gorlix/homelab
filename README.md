@@ -89,6 +89,12 @@ flowchart TB
 
     S3[(S3 · Cubbit<br/>Backup Nextcloud)]
 
+    subgraph HABK["Backup Home Assistant (3-2-1)"]
+        R2[(Cloudflare R2<br/>2 copie · milestone + daily)]
+        GD[(Google Drive<br/>4 copie · milestone, daily,<br/>parziali solo-Zigbee)]
+        LOCAL[Copia locale<br/>sul dispositivo]
+    end
+
     CF -->|tunnel casa| CFA
     CF -->|tunnel dell| CFB
     CFA --> TRA
@@ -101,6 +107,9 @@ flowchart TB
     AUTH -.SSO.-> NC
     AUTH -.SSO.-> MON
     NC -.backup.-> S3
+    HA -.backup.-> R2
+    HA -.backup.-> GD
+    HA -.backup.-> LOCAL
     AG1 <-.->|VIP failover| AG2
     TS1 <-->|Tailscale overlay| TS2
 
@@ -110,6 +119,7 @@ flowchart TB
     style HP fill:#111827,color:#fff
     style TC fill:#111827,color:#fff
     style DELL fill:#111827,color:#fff
+    style HABK fill:#14352a,color:#fff
 ```
 
 **Due region, due esposizioni indipendenti.** Ogni sito ha il proprio Cloudflare Tunnel e il proprio Traefik, così i due domini di guasto restano separati: un problema in un sito non tocca l'esposizione dell'altro.
@@ -121,7 +131,7 @@ flowchart TB
 
 **DNS:** AdGuard Home gira in coppia primario/backup (`hp-laptop` / `thinkcentre`) con IP virtuale condiviso, interamente dentro la LAN di casa — il failover VRRP sfrutta la stessa rete fisica. Dettagli in [ADR-001](docs/adr/001-adguard-ha-failover.md).
 
-> [!WARNING] Nota onesta sul perimetro
+**Backup Home Assistant:** essendo il componente di punta dell'homelab, l'hub domotico è ridondato più di ogni altro servizio, con una logica **3-2-1** su destinazioni multiple — **Cloudflare R2** (2 copie: una *milestone* e una giornaliera), **Google Drive** (4 copie: milestone, alcune giornaliere e copie parziali del solo database Zigbee) e una **copia locale** sul dispositivo. Backup completi *milestone* per i ripristini importanti, giornalieri per il recupero rapido, parziali Zigbee per rimettere in piedi in fretta la sola rete dei dispositivi.
 > La Region B gira su un'infrastruttura di rete **non sotto il mio controllo diretto** (firewall e VLAN gestiti dall'azienda che amministra l'infra aziendale). È un vincolo reale che ha guidato diverse scelte — tunnel in uscita invece di port forwarding, nessuna dipendenza da regole firewall che non controllo. Approfondito in [ADR-005](docs/adr/005-topologia-multi-sito.md).
 
 ## Stack tecnologico
