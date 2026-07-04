@@ -23,6 +23,10 @@ tags:
 - [Panoramica](#panoramica)
 - [Hardware](#hardware)
 - [Architettura](#architettura)
+  - [Due region](#due-region-due-esposizioni-indipendenti)
+  - [Interconnessione tra i siti](#interconnessione-tra-i-siti)
+  - [DNS ad alta disponibilità](#dns-ad-alta-disponibilità)
+  - [Backup di Home Assistant](#backup-di-home-assistant)
 - [Stack tecnologico](#stack-tecnologico)
 - [Struttura del repository](#struttura-del-repository)
 - [Repository come Obsidian vault](#repository-come-obsidian-vault)
@@ -122,20 +126,30 @@ flowchart TB
     style HABK fill:#14352a,color:#fff
 ```
 
-**Due region, due esposizioni indipendenti.** Ogni sito ha il proprio Cloudflare Tunnel e il proprio Traefik, così i due domini di guasto restano separati: un problema in un sito non tocca l'esposizione dell'altro.
+### Due region, due esposizioni indipendenti
+
+Ogni sito ha il proprio Cloudflare Tunnel e il proprio Traefik, così i due domini di guasto restano separati: un problema in un sito non tocca l'esposizione dell'altro.
 
 - **Region A — Casa:** `hp-laptop` + `thinkcentre` sono un **cluster Proxmox** sulla stessa LAN. Il tunnel Cloudflare di casa fronta Home Assistant e gli altri servizi locali via Traefik su `hp-laptop`. Nessuna porta esposta sul router di casa.
 - **Region B — Ditta:** `dell-emc` è un nodo **Proxmox standalone** ospitato presso l'azienda di famiglia, su una **VLAN dedicata dietro un firewall Cisco gestito e supervisionato da terzi**. Ha un Cloudflare Tunnel ad-hoc e un Traefik proprio per i servizi di produzione (Authentik, Nextcloud, bot, monitoring).
 
-**Interconnessione tra i siti:** un overlay **Tailscale** collega `hp-laptop` (Region A) e `dell-emc` (Region B) — è la rete di gestione cross-site e il canale per i servizi non pensati per l'esposizione pubblica. `thinkcentre` non ha un nodo Tailscale: resta raggiungibile solo dentro la LAN di casa.
+### Interconnessione tra i siti
 
-**DNS:** AdGuard Home gira in coppia primario/backup (`hp-laptop` / `thinkcentre`) con IP virtuale condiviso, interamente dentro la LAN di casa — il failover VRRP sfrutta la stessa rete fisica. Dettagli in [ADR-001](docs/adr/001-adguard-ha-failover.md).
+Un overlay **Tailscale** collega `hp-laptop` (Region A) e `dell-emc` (Region B) — è la rete di gestione cross-site e il canale per i servizi non pensati per l'esposizione pubblica. `thinkcentre` non ha un nodo Tailscale: resta raggiungibile solo dentro la LAN di casa.
 
-**Backup Home Assistant:** essendo il componente di punta dell'homelab, l'hub domotico è ridondato più di ogni altro servizio, con una logica **3-2-1** su destinazioni multiple — **Cloudflare R2** (2 copie: una *milestone* e una giornaliera), **Google Drive** (4 copie: milestone, alcune giornaliere e copie parziali del solo database Zigbee) e una **copia locale** sul dispositivo. Backup completi *milestone* per i ripristini importanti, giornalieri per il recupero rapido, parziali Zigbee per rimettere in piedi in fretta la sola rete dei dispositivi.
+> La Region B gira su un'infrastruttura di rete **non sotto il mio controllo diretto** (firewall e VLAN gestiti dall'azienda che amministra l'infra aziendale). È un vincolo reale che ha guidato diverse scelte — tunnel in uscita invece di port forwarding, nessuna dipendenza da regole firewall che non controllo. Approfondito in [ADR-005](docs/adr/005-topologia-multi-sito.md).
+
+### DNS ad alta disponibilità
+
+AdGuard Home gira in coppia primario/backup (`hp-laptop` / `thinkcentre`) con IP virtuale condiviso, interamente dentro la LAN di casa — il failover VRRP sfrutta la stessa rete fisica. Dettagli in [ADR-001](docs/adr/001-adguard-ha-failover.md).
+
+### Backup di Home Assistant
+
+Essendo il componente di punta dell'homelab, l'hub domotico è ridondato più di ogni altro servizio, con una logica **3-2-1** su destinazioni multiple — **Cloudflare R2** (2 copie: una *milestone* e una giornaliera), **Google Drive** (4 copie: milestone, alcune giornaliere e copie parziali del solo database Zigbee) e una **copia locale** sul dispositivo. Backup completi *milestone* per i ripristini importanti, giornalieri per il recupero rapido, parziali Zigbee per rimettere in piedi in fretta la sola rete dei dispositivi.
 
 > [!NOTE] Perché sparpagliati su più servizi?
-> Diciamocelo francamente: distribuire le copie su provider diversi serve anche a **spremere i piani gratuiti** di ciascuno. Cloudflare R2 non fa pagare l'egress, Google Drive regala qualche giga — spalmare i backup tiene la bolletta a zero e, come effetto collaterale niente male, aggiunge *vera* ridondanza tra fornitori indipendenti. Taccagneria e resilienza che per una volta vanno d'accordo. 🐿️
-> La Region B gira su un'infrastruttura di rete **non sotto il mio controllo diretto** (firewall e VLAN gestiti dall'azienda che amministra l'infra aziendale). È un vincolo reale che ha guidato diverse scelte — tunnel in uscita invece di port forwarding, nessuna dipendenza da regole firewall che non controllo. Approfondito in [ADR-005](docs/adr/005-topologia-multi-sito.md).
+> Diciamocelo francamente: distribuire le copie su provider diversi serve anche a **spremere i piani gratuiti** di ciascuno. Cloudflare R2 non fa pagare l'egress, Google Drive regala qualche giga — spalmare i backup tiene la bolletta a zero e, come effetto collaterale niente male, aggiunge *vera* ridondanza tra fornitori indipendenti. Taccagneria e resilienza che per una volta vanno d'accordo. 
+
 
 ## Stack tecnologico
 
