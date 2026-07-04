@@ -1,0 +1,81 @@
+# Segreti e credenziali
+.env
+.env.*
+!.env.tpl
+!.env.example
+*.pem
+*.key
+*_rsa
+*_ed25519
+id_rsa*
+id_ed25519*
+*.pfx
+*.p12
+secrets/
+vault_pass*
+.op-token
+
+# Terraform / OpenTofu
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+.terraform.lock.hcl
+
+# === Ansible ===
+*.retry
+ansible/inventory/host_vars/**/vault*.yml
+!ansible/inventory/host_vars/**/vault*.example.yml
+
+# === Docker ===
+docker/**/data/
+docker/**/volumes/
+docker/**/*.log
+
+# Home Assistant (contiene dati sensibili di posizione/rete)
+home-assistant/secrets.yaml
+home-assistant/.storage/
+home-assistant/*.db
+home-assistant/*.db-*
+
+# Kubernetes
+kubernetes/**/secrets/
+*.kubeconfig
+kubeconfig*
+
+# 1Password
+.op/
+op-connect-credentials.json
+1password-credentials.json
+
+# MkDocs build output
+site/
+
+# === Obsidian vault ===
+# Il repo è pensato per essere aperto anche come vault Obsidian (vedi README).
+# NON versiono la cartella di config del vault: contiene stato UI machine-specific,
+# bundle di plugin/temi di terze parti (codice vendorizzato, non mio) e data.json
+# per-account che possono includere identificatori o token (es. il plugin di
+# collaborazione system3-relay). Chi clona il repo lo apre con la propria config.
+.obsidian/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Backup e temporanei
+*.bak
+*.tmp
+*.orig
