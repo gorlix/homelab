@@ -44,7 +44,13 @@ ansible/collections/
 .venv-1password/
 
 # Docker
+# Stato/dati runtime dei bind mount definiti nei docker-compose.yml versionati
+# (mai la stessa cartella per due servizi diversi, i nomi seguono quello che c'è
+# davvero nei volumes: di ciascun docker-compose.yml — se un servizio futuro
+# monta una cartella dati con un nome nuovo, va aggiunta qui esplicitamente).
 docker/**/data/
+docker/**/pgdata/
+docker/**/meili_data/
 docker/**/volumes/
 docker/**/*.log
 
