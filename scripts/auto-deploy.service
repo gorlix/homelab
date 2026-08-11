@@ -1,0 +1,9 @@
+[Unit]
+Description=Sincronizza /opt con origin/main e ridispiega i servizi cambiati
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt
+ExecStart=/opt/scripts/auto-deploy.sh
