@@ -3,9 +3,23 @@
   "extends": ["config:recommended"],
   "timezone": "Europe/Rome",
   "schedule": ["before 6am on monday"],
+  "minimumReleaseAge": "3 days",
   "packageRules": [
     {
-      "description": "Immagini stateful (database/motori di ricerca): un major bump automatico di postgres su infisical-db (14 -> 18) ha mandato giù il servizio l'11/08/2026 — Postgres 18+ richiede pg_upgrade reale, non basta cambiare il tag immagine. Major update per queste immagini richiedono un click esplicito sulla Dependency Dashboard invece di aprire una PR da sola; minor/patch restano automatici.",
+      "description": "Automerge di default per minor/patch (i major restano esclusi dalle regole più sotto). Nessuna CI in questo repo (vedi roadmap in CLAUDE.md) quindi ignoreTests: true — senza, Renovate aspetterebbe indefinitamente dei check che non esistono. minimumReleaseAge sopra dà comunque un margine di 3 giorni prima che un aggiornamento venga anche solo proposto, unica rete di sicurezza in assenza di test automatici.",
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "ignoreTests": true
+    },
+    {
+      "description": "Immagini stateful (database/motori di ricerca): niente automerge nemmeno per minor/patch — un bump 'sicuro' su queste può comunque sorprendere. Regola più specifica della precedente, la sovrascrive per questi pacchetti (Renovate applica le packageRules in ordine, l'ultima che matcha vince).",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["postgres", "getmeili/meilisearch", "redis", "influxdb"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": false
+    },
+    {
+      "description": "Immagini stateful, major update: un bump automatico di postgres su infisical-db (14 -> 18) ha mandato giù il servizio l'11/08/2026 — Postgres 18+ richiede pg_upgrade reale, non basta cambiare il tag immagine. Richiede un click esplicito sulla Dependency Dashboard invece di aprire una PR da sola.",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["postgres", "getmeili/meilisearch", "redis", "influxdb"],
       "matchUpdateTypes": ["major"],
