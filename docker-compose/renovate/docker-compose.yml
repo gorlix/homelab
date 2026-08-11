@@ -1,0 +1,22 @@
+# Renovate self-hosted non ha una modalità daemon nativa: la documentazione
+# ufficiale conferma che ogni invocazione scansiona una volta ed esce, va
+# ripetuta da uno scheduler esterno (verificato prima di scrivere questo
+# file, non assunto). Per restare nello stesso pattern di tutti gli altri
+# servizi qui dentro (`docker compose up -d`, nessun cron esterno sull'host)
+# l'entrypoint sostituisce l'esecuzione one-shot con un loop minimo: scansiona,
+# aspetta RENOVATE_INTERVAL_SECONDS (default 1h), ripete.
+services:
+  renovate:
+    image: renovate/renovate:44.24.1
+    container_name: renovate
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      RENOVATE_PLATFORM: github
+      RENOVATE_REPOSITORIES: '["gorlix/homelab"]'
+      RENOVATE_ONBOARDING: "false"
+      RENOVATE_REQUIRE_CONFIG: optional
+    entrypoint:
+      - sh
+      - -c
+      - "while true; do renovate; sleep ${RENOVATE_INTERVAL_SECONDS:-3600}; done"
