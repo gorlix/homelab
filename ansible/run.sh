@@ -8,10 +8,13 @@
 # che da un ssh-agent già popolato da Tofu — per questo serve comunque il vault.
 set -euo pipefail
 
-# ID del vault "PVE-Automation" — non è un segreto (è solo un identificativo), va
-# bene un default qui per comodità nell'uso quotidiano di run.sh. Override con
-# ONEPASSWORD_VAULT_ID=... ./run.sh se in futuro si usa un vault diverso.
-ONEPASSWORD_VAULT_ID="${ONEPASSWORD_VAULT_ID:-ttxxilzprndudv5h4rw6saruw4}"
+# L'id del vault non è di per sé un segreto (senza OP_CONNECT_TOKEN non apre
+# nulla), ma è comunque l'identificativo reale del vault di produzione: repo
+# pubblico, quindi niente default hardcoded qui — va passato esplicitamente.
+if [ -z "${ONEPASSWORD_VAULT_ID:-}" ]; then
+  echo "ONEPASSWORD_VAULT_ID non impostato. Esporta l'id del vault 1Password da usare (vedi ADR-006)." >&2
+  exit 1
+fi
 
 # Fonte canonica del token: il file .env accanto a credentials.json (0600, mai in
 # git). Se già esportato in ambiente (es. da un run precedente nella stessa shell)

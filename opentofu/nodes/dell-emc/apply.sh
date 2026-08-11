@@ -26,9 +26,13 @@ if [ -z "${OP_CONNECT_TOKEN:-}" ]; then
   exit 1
 fi
 
-# ID del vault "PVE-Automation" — non è un segreto, va bene un default qui per
-# comodità. Override con ONEPASSWORD_VAULT_ID=... ./apply.sh se cambia in futuro.
-ONEPASSWORD_VAULT_ID="${ONEPASSWORD_VAULT_ID:-ttxxilzprndudv5h4rw6saruw4}"
+# L'id del vault non è di per sé un segreto (senza OP_CONNECT_TOKEN non apre
+# nulla), ma è comunque l'identificativo reale del vault di produzione: repo
+# pubblico, quindi niente default hardcoded qui — va passato esplicitamente.
+if [ -z "${ONEPASSWORD_VAULT_ID:-}" ]; then
+  echo "ONEPASSWORD_VAULT_ID non impostato. Esporta l'id del vault 1Password da usare (vedi ADR-006)." >&2
+  exit 1
+fi
 
 cd "$(dirname "$0")"
 tofu "$@" -var onepassword_vault_id="$ONEPASSWORD_VAULT_ID"
