@@ -1,0 +1,19 @@
+# Agente Hawser per Dockhand, installato di default su OGNI nodo che riceve
+# Docker (ruolo ansible/roles/hawser, girato in Fase 1 di site.yml, hosts: all
+# — non gated dalla lista "services" per-host di variables.tf come gli altri
+# stack). Modalità Standard/locale: TOKEN è generato per-host (openssl, non
+# condiviso), non emesso da Dockhand — vedi ansible/roles/hawser/tasks/main.yml
+# per il perché (modalità Edge scartata, problema reale riscontrato).
+services:
+  hawser:
+    image: ghcr.io/finsys/hawser:0.2.26
+    container_name: hawser
+    restart: unless-stopped
+    ports:
+      - "2376:2376"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt:/opt/hawser-stacks
+    environment:
+      STACKS_DIR: /opt/hawser-stacks
+    env_file: .env

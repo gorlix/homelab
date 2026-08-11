@@ -21,23 +21,20 @@
     state: directory
     mode: '0755'
 
-- name: Genera docker-compose.yml per Hawser (modalità Standard/locale)
+- name: Copia il docker-compose.yml di Hawser dalla fonte di verità tracciata
+  # docker-compose/hawser/ nel repo (stesso path/nome di /opt/docker-compose su
+  # pve-management, tracciato direttamente — vedi commit di ristrutturazione
+  # docker/ -> docker-compose/) è un container come tutti gli altri, non un
+  # template generato al volo da questo ruolo: prima veniva scritto qui sotto
+  # come contenuto letterale (ansible.builtin.copy: content:), invisibile a chi
+  # legge il repo e diverso, in linea di principio, da quello che gira davvero.
+  # A differenza del ruolo docker_service (che copia solo per i servizi elencati
+  # in variables.tf), questo task gira SEMPRE, su ogni host di questa play
+  # (hosts: all in Fase 1): Hawser va installato di default ovunque arrivi
+  # Docker, non è opzionale per host come gli altri stack.
   ansible.builtin.copy:
+    src: /opt/docker-compose/hawser/docker-compose.yml
     dest: /opt/hawser/docker-compose.yml
-    content: |
-      services:
-        hawser:
-          image: ghcr.io/finsys/hawser:0.2.26
-          container_name: hawser
-          restart: unless-stopped
-          ports:
-            - "2376:2376"
-          volumes:
-            - /var/run/docker.sock:/var/run/docker.sock
-            - /opt:/opt/hawser-stacks
-          environment:
-            STACKS_DIR: /opt/hawser-stacks
-          env_file: .env
     mode: '0644'
 
 - name: Genera .env con il token per-host recuperato da Infisical (mai scritto nel repo)
