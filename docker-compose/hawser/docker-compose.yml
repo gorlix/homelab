@@ -6,7 +6,7 @@
 # per il perché (modalità Edge scartata, problema reale riscontrato).
 services:
   hawser:
-    image: ghcr.io/finsys/hawser:0.2.26
+    image: ghcr.io/finsys/hawser:0.2.46
     container_name: hawser
     restart: unless-stopped
     ports:
