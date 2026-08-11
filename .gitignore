@@ -31,19 +31,19 @@ override.tf.json
 terraform.rc
 .terraform.lock.hcl
 
-# === Ansible ===
+# Ansible
 *.retry
 ansible/inventory/host_vars/**/vault*.yml
 !ansible/inventory/host_vars/**/vault*.example.yml
 # inventory.yml sotto ansible/nodes è generato da OpenTofu (local_file.ansible_inventory
-# in terraform/nodes/*/main.tf), non va versionato: la fonte di verità è variables.tf
+# in opentofu/nodes/*/main.tf), non va versionato: la fonte di verità è variables.tf
 ansible/inventory.yml
 # collection installate da requirements.yml (vedi ansible.cfg collections_path)
 ansible/collections/
 # virtualenv di bootstrap per l'SDK 1Password Connect (roles/onepassword_bootstrap)
 .venv-1password/
 
-# === Docker ===
+# Docker
 docker/**/data/
 docker/**/volumes/
 docker/**/*.log
@@ -67,12 +67,11 @@ op-connect-credentials.json
 # MkDocs build output
 site/
 
-# === Obsidian vault ===
+# Obsidian vault
 # Il repo è pensato per essere aperto anche come vault Obsidian (vedi README).
 # NON versiono la cartella di config del vault: contiene stato UI machine-specific,
 # bundle di plugin/temi di terze parti (codice vendorizzato, non mio) e data.json
-# per-account che possono includere identificatori o token (es. il plugin di
-# collaborazione system3-relay). Chi clona il repo lo apre con la propria config.
+# per-account che possono includere identificatori o token
 .obsidian/
 
 # OS / editor
