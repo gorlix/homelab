@@ -3,7 +3,7 @@
 # ruolo Ansible infisical_secrets + docker_service, non versionati qui.
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     env_file: .env
     restart: always
     volumes:
