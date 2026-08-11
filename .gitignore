@@ -35,6 +35,13 @@ terraform.rc
 *.retry
 ansible/inventory/host_vars/**/vault*.yml
 !ansible/inventory/host_vars/**/vault*.example.yml
+# inventory.yml sotto ansible/nodes è generato da OpenTofu (local_file.ansible_inventory
+# in terraform/nodes/*/main.tf), non va versionato: la fonte di verità è variables.tf
+ansible/inventory.yml
+# collection installate da requirements.yml (vedi ansible.cfg collections_path)
+ansible/collections/
+# virtualenv di bootstrap per l'SDK 1Password Connect (roles/onepassword_bootstrap)
+.venv-1password/
 
 # === Docker ===
 docker/**/data/

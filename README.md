@@ -168,7 +168,7 @@ Essendo il componente di punta dell'homelab, l'hub domotico è ridondato più di
 | Storage / file sync | Nextcloud (backup su S3 Cubbit) |
 | Videosorveglianza | Frigate |
 | Domotica | Home Assistant |
-| Secret management | 1Password (Connect + Service Accounts) |
+| Secret management | 1Password (Connect + Service Accounts) per i segreti infrastrutturali; Infisical self-hosted per gli `.env` applicativi |
 | Documentazione | MkDocs Material + GitHub Pages |
 | CI | GitHub Actions |
 
@@ -178,7 +178,7 @@ Essendo il componente di punta dell'homelab, l'hub domotico è ridondato più di
 homelab/
 ├── docs/                      # documentazione estesa (MkDocs)
 │   └── adr/                   # Architecture Decision Records
-├── terraform/                 # provisioning VM/LXC su Proxmox
+├── opentofu/                  # provisioning VM/LXC su Proxmox
 │   └── nodes/{dell-emc,hp-laptop,thinkcentre}/
 ├── ansible/                   # configurazione OS e deploy
 ├── docker/                    # docker-compose per ogni stack
@@ -214,27 +214,27 @@ Ogni scelta non banale è documentata nel formato *Contesto → Decisione → Co
 - [ADR-000](docs/adr/000-metodologia-ai.md) — Metodologia di lavoro e uso di strumenti AI
 - [ADR-001](docs/adr/001-adguard-ha-failover.md) — DNS ad alta disponibilità con IP virtuale condiviso
 - [ADR-005](docs/adr/005-topologia-multi-sito.md) — Topologia multi-sito (2 region) e separazione dei ruoli tra i nodi
+- [ADR-006](docs/adr/006-1password-connect.md) — Secret management con 1Password Connect
+- [ADR-007](docs/adr/007-infisical-env-management.md) — Gestione delle variabili d'ambiente con Infisical
 
 Decisioni già prese ma non ancora scritte per esteso (in programmazione):
 
 - ADR-002 — Cloudflare Tunnel invece di port forwarding
 - ADR-003 — SSO centralizzato con Authentik
 - ADR-004 — Strategia di backup 3-2-1 su S3 Cubbit
-- ADR-006 — Secret management con 1Password Connect
 
 ## Secret management
 
-Nessun segreto in chiaro nel repository. I file committati contengono solo **riferimenti** (`op://vault/item/field`) risolti a runtime tramite [1Password CLI](https://developer.1password.com/docs/cli/) e **1Password Connect**, self-hosted sulla tailnet. Dettagli architetturali in ADR-006 (in programmazione).
+Nessun segreto in chiaro nel repository. I file committati contengono solo **riferimenti** (`op://vault/item/field`) risolti a runtime tramite [1Password CLI](https://developer.1password.com/docs/cli/) e **1Password Connect**, self-hosted su `dell-emc`. Dettagli architetturali e limiti noti in [ADR-006](docs/adr/006-1password-connect.md).
 
 Protezione aggiuntiva: **gitleaks** in pre-commit e in CI, per intercettare eventuali segreti incollati per errore.
 
 ## Roadmap
 
-- [x] Documentazione architetturale e primi ADR (000, 001 — gli altri in programmazione)
+- [x] Documentazione architetturale e primi ADR (000, 001, 005, 006 — 002/003/004 in programmazione)
 - [ ] Docker Compose versionato e sanitizzato per tutti i servizi
-- [ ] Ansible playbooks per configurazione dei 3 nodi
-- [ ] OpenTofu per provisioning VM/LXC su Proxmox
-- [ ] Migrazione secret management su 1Password Connect
+- [ ] OpenTofu + Ansible per provisioning e setup base dei container LXC su `dell-emc` (in corso — funzionante per il nodo Docker-100, da estendere agli altri nodi e da verificare end-to-end dopo la riemissione del token Connect, vedi ADR-006)
+- [ ] Migrazione secret management su 1Password Connect (in corso — Connect è in produzione, lettura/scrittura da OpenTofu e Ansible implementata, verifica end-to-end pendente, vedi ADR-006)
 - [ ] Cluster Kubernetes gestito in GitOps con Flux CD
 - [ ] Sito di documentazione pubblicato su GitHub Pages
 

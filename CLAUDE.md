@@ -54,7 +54,7 @@ Tutti e 3 su **Proxmox VE**.
 | Servizi | Docker Compose | Esistente, da versionare/sanitizzare |
 | Orchestrazione | Kubernetes + Flux CD | WIP |
 | DNS HA | AdGuard Home + **Keepalived/VRRP** (failover IP) + **adguardhome-sync** (bakito/adguardhome-sync, sync config origin→replica) | Documentato in ADR-001 |
-| Secret management | **1Password** (Connect self-hosted su hp-laptop via Tailscale, + Service Accounts per CI/Ansible/Terraform) | Deciso, da implementare (ADR-006, non ancora scritto per esteso) |
+| Secret management | **1Password** (Connect self-hosted su `dell-emc`/`pve-management`, non su hp-laptop come originariamente ipotizzato) per i segreti infrastrutturali; **Infisical** self-hosted per gli `.env` applicativi dei servizi Docker Compose | Implementato (ADR-006, ADR-007) |
 | Documentazione | MkDocs Material + GitHub Pages | Da impostare |
 | CI | GitHub Actions (lint, validate, gitleaks) | Da impostare |
 
@@ -65,7 +65,7 @@ homelab/
 ├── README.md
 ├── docs/
 │   └── adr/                   # Architecture Decision Records
-├── terraform/
+├── opentofu/
 │   └── nodes/{dell-emc,hp-laptop,thinkcentre}/
 ├── ansible/
 ├── docker/
@@ -87,13 +87,14 @@ homelab/
 - **ADR-000** — Metodologia di lavoro e uso di strumenti AI (meta-ADR, leggere per capire come trattare l'assistenza AI in questo repo)
 - **ADR-001** — DNS HA con Keepalived/VRRP + adguardhome-sync
 - **ADR-005** — Topologia multi-sito (2 region) e separazione dei ruoli tra i nodi
+- **ADR-006** — Secret management infrastrutturale con 1Password Connect
+- **ADR-007** — Gestione delle variabili d'ambiente applicative con Infisical
 
 ## ADR ancora da scrivere (menzionati nel README come placeholder)
 
 - ADR-002 — Cloudflare Tunnel invece di port forwarding
 - ADR-003 — Authentik come SSO centralizzato
 - ADR-004 — Strategia di backup 3-2-1 Nextcloud su S3 Cubbit
-- ADR-006 — Secret management con 1Password Connect
 
 ## Convenzioni stabilite
 
