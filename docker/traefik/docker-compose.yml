@@ -1,0 +1,45 @@
+# .env (solo TUNNEL_TOKEN per cloudflared) non presente in questa cartella:
+# migrato su Infisical (vedi ADR-007), generato al deploy dal ruolo Ansible
+# infisical_secrets + docker_service.
+services:
+  traefik:
+    image: traefik:v3.7.10
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=traefik_proxy
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+      - --entrypoints.web.address=:80
+      - --api.dashboard=false
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./dynamic:/etc/traefik/dynamic:ro
+    ports:
+      # Pubblicata sull'host: il tunnel Cloudflare ha DUE connector attivi sullo
+      # stesso tunnel (quello vecchio su pve bare-metal + questo su Traefik-110)
+      # e load-bilancia tra loro. Un nome Docker interno come "traefik:80" risolve
+      # solo dal connector su QUESTO host; un IP:porta pubblicato funziona da
+      # entrambi, stesso pattern di ogni altra route già configurata su questo
+      # tunnel (tutte per IP, nessuna per nome container).
+      - "80:80"
+    networks:
+      - traefik_proxy
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.7.3
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    env_file: .env
+    networks:
+      - traefik_proxy
+    depends_on:
+      - traefik
+
+networks:
+  traefik_proxy:
+    name: traefik_proxy
+    external: true

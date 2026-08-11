@@ -1,0 +1,24 @@
+services:
+  op-connect-api:
+    image: 1password/connect-api:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./1password-credentials.json:/home/opuser/.op/1password-credentials.json:ro
+      - op-data:/home/opuser/.op/data
+    environment:
+      OP_HTTP_PORT: "8080"
+    restart: always
+    depends_on:
+      - op-connect-sync
+
+  op-connect-sync:
+    image: 1password/connect-sync:latest
+    volumes:
+      - ./1password-credentials.json:/home/opuser/.op/1password-credentials.json:ro
+      - op-data:/home/opuser/.op/data
+    restart: always
+
+volumes:
+  op-data:
+    name: 1password-connect_op-data

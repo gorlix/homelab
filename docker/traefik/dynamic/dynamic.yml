@@ -1,0 +1,27 @@
+http:
+  routers:
+    infisical:
+      rule: "Host(`env.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: infisical
+
+    onepassword-connect:
+      rule: "Host(`1p.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: onepassword-connect
+
+  services:
+    # Infisical e 1Password Connect girano su pve-management (192.168.10.200), un
+    # host diverso da quello di Traefik (192.168.10.110): niente docker provider/
+    # label per loro, Traefik li raggiunge come backend statici via IP interno.
+    infisical:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.200:8090"
+
+    onepassword-connect:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.200:8080"
