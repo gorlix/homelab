@@ -25,9 +25,13 @@ Ogni decisione non banale è un ADR nel formato *Contesto → Decisione → Alte
 |---|---|---|
 | [ADR-000](adr/000-metodologia-ai.md) | Metodologia di lavoro e uso di strumenti AI | Accettato |
 | [ADR-001](adr/001-adguard-ha-failover.md) | DNS ad alta disponibilità (Keepalived/VRRP) | Accettato |
+| [ADR-002](adr/002-cloudflare-tunnel.md) | Esposizione pubblica con Cloudflare Tunnel | Accettato |
 | [ADR-005](adr/005-topologia-multi-sito.md) | Topologia multi-sito (2 region) | Accettato |
+| [ADR-006](adr/006-1password-connect.md) | Secret management con 1Password Connect | Accettato |
+| [ADR-007](adr/007-infisical-env-management.md) | Gestione delle variabili d'ambiente con Infisical | Accettato |
+| [ADR-008](adr/008-docker-compose-management.md) | Docker Compose, Renovate, deploy automatico | Accettato |
 
-**In programmazione:** ADR-002 (Cloudflare Tunnel), ADR-003 (Authentik SSO), ADR-004 (backup 3-2-1 su S3 Cubbit), ADR-006 (1Password).
+**In programmazione:** ADR-003 (Authentik SSO), ADR-004 (backup 3-2-1 su S3 Cubbit).
 
 ## Navigare per tag
 

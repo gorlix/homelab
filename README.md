@@ -158,7 +158,8 @@ Essendo il componente di punta dell'homelab, l'hub domotico è ridondato più di
 | Virtualizzazione | Proxmox VE |
 | Provisioning | OpenTofu (provider `bpg/proxmox`) |
 | Configuration management | Ansible |
-| Servizi | Docker Compose |
+| Servizi | Docker Compose, tracciato direttamente in `docker-compose/` ([ADR-008](docs/adr/008-docker-compose-management.md)) |
+| Aggiornamenti automatici | Renovate self-hosted (minor/patch in automerge, major delle immagini stateful dietro approvazione manuale) + timer systemd per il deploy ([ADR-008](docs/adr/008-docker-compose-management.md)) |
 | Orchestrazione (WIP) | Kubernetes + Flux CD |
 | Reverse proxy | Traefik |
 | Esposizione pubblica | Cloudflare Tunnel |
@@ -176,22 +177,27 @@ Essendo il componente di punta dell'homelab, l'hub domotico è ridondato più di
 
 ```
 homelab/
+├── renovate.json              # config Renovate (ADR-008)
 ├── docs/                      # documentazione estesa (MkDocs)
 │   └── adr/                   # Architecture Decision Records
 ├── opentofu/                  # provisioning VM/LXC su Proxmox
 │   └── nodes/{dell-emc,hp-laptop,thinkcentre}/
 ├── ansible/                   # configurazione OS e deploy
+├── scripts/                   # gitleaks hook, timer di deploy automatico (ADR-008)
+├── .claude/skills/             # skill per scaffoldare nuovi servizi già sanitizzati
 ├── docker-compose/             # docker-compose per ogni stack — stesso nome/path
-│   │                           # dei nodi reali, tracciata direttamente
+│   │                           # dei nodi reali, tracciata direttamente (ADR-008).
+│   │                           # Reali oggi: 1password-connect, infisical, linkwarden,
+│   │                           # monitoring, traefik, hawser, Semaphore, renovate.
 │   ├── traefik/
-│   ├── adguard/
-│   ├── frigate/
-│   ├── nextcloud/
-│   ├── authentik/
+│   ├── adguard/                # non ancora versionato (Region A)
+│   ├── frigate/                # non ancora versionato (Region A)
+│   ├── nextcloud/               # non ancora versionato
+│   ├── authentik/               # non ancora versionato
 │   └── monitoring/
 ├── kubernetes/                # manifest / Flux (WIP)
 ├── home-assistant/            # configurazione domotica
-└── .github/workflows/         # CI: lint, validate, deploy docs
+└── .github/workflows/         # CI: lint, validate, deploy docs (ancora da impostare)
 ```
 
 ## Repository come Obsidian vault
@@ -214,28 +220,31 @@ Ogni scelta non banale è documentata nel formato *Contesto → Decisione → Co
 
 - [ADR-000](docs/adr/000-metodologia-ai.md) — Metodologia di lavoro e uso di strumenti AI
 - [ADR-001](docs/adr/001-adguard-ha-failover.md) — DNS ad alta disponibilità con IP virtuale condiviso
+- [ADR-002](docs/adr/002-cloudflare-tunnel.md) — Esposizione pubblica con Cloudflare Tunnel
 - [ADR-005](docs/adr/005-topologia-multi-sito.md) — Topologia multi-sito (2 region) e separazione dei ruoli tra i nodi
 - [ADR-006](docs/adr/006-1password-connect.md) — Secret management con 1Password Connect
 - [ADR-007](docs/adr/007-infisical-env-management.md) — Gestione delle variabili d'ambiente con Infisical
+- [ADR-008](docs/adr/008-docker-compose-management.md) — Versionamento docker-compose, aggiornamenti automatici (Renovate), deploy automatico
 
 Decisioni già prese ma non ancora scritte per esteso (in programmazione):
 
-- ADR-002 — Cloudflare Tunnel invece di port forwarding
 - ADR-003 — SSO centralizzato con Authentik
 - ADR-004 — Strategia di backup 3-2-1 su S3 Cubbit
 
 ## Secret management
 
-Nessun segreto in chiaro nel repository. I file committati contengono solo **riferimenti** (`op://vault/item/field`) risolti a runtime tramite [1Password CLI](https://developer.1password.com/docs/cli/) e **1Password Connect**, self-hosted su `dell-emc`. Dettagli architetturali e limiti noti in [ADR-006](docs/adr/006-1password-connect.md).
+Nessun segreto in chiaro nel repository. I file committati contengono solo **riferimenti** (`op://vault/item/field`) risolti a runtime tramite [1Password CLI](https://developer.1password.com/docs/cli/) e **1Password Connect**, self-hosted su `dell-emc`; i segreti applicativi dei servizi Docker Compose vivono invece su **Infisical**, self-hosted ([ADR-007](docs/adr/007-infisical-env-management.md)). Dettagli architetturali e limiti noti in [ADR-006](docs/adr/006-1password-connect.md).
 
-Protezione aggiuntiva: **gitleaks** in pre-commit e in CI, per intercettare eventuali segreti incollati per errore.
+Protezione aggiuntiva: **gitleaks** come pre-commit hook (repo locale e checkout su `pve-management`) — rete di sicurezza, non la difesa primaria. CI su GitHub Actions ancora da impostare.
 
 ## Roadmap
 
-- [x] Documentazione architetturale e primi ADR (000, 001, 005, 006 — 002/003/004 in programmazione)
-- [ ] Docker Compose versionato e sanitizzato per tutti i servizi
-- [ ] OpenTofu + Ansible per provisioning e setup base dei container LXC su `dell-emc` (in corso — funzionante per il nodo Docker-100, da estendere agli altri nodi e da verificare end-to-end dopo la riemissione del token Connect, vedi ADR-006)
-- [ ] Migrazione secret management su 1Password Connect (in corso — Connect è in produzione, lettura/scrittura da OpenTofu e Ansible implementata, verifica end-to-end pendente, vedi ADR-006)
+- [x] Documentazione architetturale e ADR (000, 001, 002, 005, 006, 007, 008 — 003/004 in programmazione)
+- [x] OpenTofu + Ansible per provisioning e setup base dei container LXC su `dell-emc` (`Docker-100`, `Traefik-110` — `hp-laptop`/`thinkcentre` ancora da fare)
+- [x] Migrazione secret management su 1Password Connect + Infisical, in produzione
+- [x] Docker Compose versionato e sanitizzato per i servizi di `dell-emc`, aggiornamenti automatici con Renovate, deploy automatico via timer systemd ([ADR-008](docs/adr/008-docker-compose-management.md)) — Region A ancora da versionare
+- [ ] CI reale su GitHub Actions (gitleaks già attivo solo come pre-commit hook locale)
+- [ ] Sito di documentazione pubblicato (MkDocs Material + GitHub Pages)
 - [ ] Cluster Kubernetes gestito in GitOps con Flux CD
 - [ ] Sito di documentazione pubblicato su GitHub Pages
 

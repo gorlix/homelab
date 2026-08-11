@@ -49,34 +49,41 @@ Tutti e 3 su **Proxmox VE**.
 
 | Area | Strumento | Stato |
 |---|---|---|
-| Provisioning | OpenTofu (`bpg/proxmox` provider) | Da iniziare |
-| Config management | Ansible | Da iniziare |
-| Servizi | Docker Compose | Esistente, da versionare/sanitizzare |
-| Orchestrazione | Kubernetes + Flux CD | WIP |
+| Provisioning | OpenTofu (`bpg/proxmox` provider) | Implementato per `dell-emc` (`Docker-100`, `Traefik-110`) — `hp-laptop`/`thinkcentre` non ancora |
+| Config management | Ansible | Implementato per `dell-emc` — stessa estensione mancante di sopra |
+| Servizi | Docker Compose, tracciato direttamente in `docker-compose/` (ADR-008) | Versionato e sanitizzato per gli 8 servizi di `dell-emc` — Region A (Home Assistant, AdGuard, Frigate) non ancora |
+| Aggiornamenti automatici | Renovate self-hosted (minor/patch in automerge, major e immagini stateful dietro approvazione manuale) + timer systemd per il deploy | Implementato per `dell-emc` (ADR-008) |
+| Orchestrazione | Kubernetes + Flux CD | WIP, non ancora iniziato per davvero |
 | DNS HA | AdGuard Home + **Keepalived/VRRP** (failover IP) + **adguardhome-sync** (bakito/adguardhome-sync, sync config origin→replica) | Documentato in ADR-001 |
+| Esposizione pubblica | Cloudflare Tunnel + Traefik | Implementato (ADR-002) |
 | Secret management | **1Password** (Connect self-hosted su `dell-emc`/`pve-management`, non su hp-laptop come originariamente ipotizzato) per i segreti infrastrutturali; **Infisical** self-hosted per gli `.env` applicativi dei servizi Docker Compose | Implementato (ADR-006, ADR-007) |
 | Documentazione | MkDocs Material + GitHub Pages | Da impostare |
-| CI | GitHub Actions (lint, validate, gitleaks) | Da impostare |
+| CI | GitHub Actions (lint, validate, gitleaks) | Da impostare — gitleaks già attivo come pre-commit hook locale (repo + `pve-management`), non ancora in CI su GitHub |
 
 ## Struttura repository
 
 ```
 homelab/
 ├── README.md
+├── renovate.json               # config Renovate (ADR-008)
 ├── docs/
 │   └── adr/                   # Architecture Decision Records
 ├── opentofu/
 │   └── nodes/{dell-emc,hp-laptop,thinkcentre}/
 ├── ansible/
-├── docker-compose/             # stessa cartella, stesso nome, dei nodi reali (es. /opt/docker-compose
-│   │                           # su pve-management) — tracciata direttamente, non una copia separata
+├── scripts/                    # gitleaks hook, timer auto-deploy (ADR-008)
+├── .claude/skills/              # skill per scaffoldare nuovi servizi già sanitizzati
+├── docker-compose/              # stessa cartella, stesso nome, dei nodi reali (es. /opt/docker-compose
+│   │                            # su pve-management) — tracciata direttamente, non una copia separata
+│   │                            # (ADR-008). Servizi reali oggi: 1password-connect, infisical,
+│   │                            # linkwarden, monitoring, traefik, hawser, Semaphore, renovate.
 │   ├── traefik/
-│   ├── adguard/
+│   ├── adguard/                # non ancora versionato (Region A)
 │   │   ├── keepalived/
 │   │   └── sync/              # config adguardhome-sync
-│   ├── frigate/
-│   ├── nextcloud/
-│   ├── authentik/
+│   ├── frigate/                # non ancora versionato (Region A)
+│   ├── nextcloud/               # non ancora versionato
+│   ├── authentik/               # non ancora versionato
 │   └── monitoring/
 ├── kubernetes/
 ├── home-assistant/
@@ -87,13 +94,14 @@ homelab/
 
 - **ADR-000** — Metodologia di lavoro e uso di strumenti AI (meta-ADR, leggere per capire come trattare l'assistenza AI in questo repo)
 - **ADR-001** — DNS HA con Keepalived/VRRP + adguardhome-sync
+- **ADR-002** — Esposizione pubblica con Cloudflare Tunnel
 - **ADR-005** — Topologia multi-sito (2 region) e separazione dei ruoli tra i nodi
 - **ADR-006** — Secret management infrastrutturale con 1Password Connect
 - **ADR-007** — Gestione delle variabili d'ambiente applicative con Infisical
+- **ADR-008** — Versionamento docker-compose, aggiornamenti automatici (Renovate), deploy automatico
 
 ## ADR ancora da scrivere (menzionati nel README come placeholder)
 
-- ADR-002 — Cloudflare Tunnel invece di port forwarding
 - ADR-003 — Authentik come SSO centralizzato
 - ADR-004 — Strategia di backup 3-2-1 Nextcloud su S3 Cubbit
 
@@ -105,24 +113,25 @@ homelab/
 
 **Regola d'oro per ogni file pubblicato (config, non solo doc):** prima di ogni commit, l'autore deve poter spiegare il file riga per riga senza guardarlo. Claude Code non deve generare configurazioni che l'utente non ha revisionato e compreso — se propone una configurazione complessa, deve accompagnarla con una spiegazione chiara del *perché*, non solo del *cosa*.
 
-**Segreti:** nessun valore in chiaro nel repo. Solo riferimenti `op://vault/item/field` risolti a runtime con 1Password CLI/Connect. Gitleaks in pre-commit e CI come rete di sicurezza aggiuntiva. Attenzione anche a segreti "impliciti": IP pubblici, MAC address, coordinate GPS in config Home Assistant, serial number nei log — vanno sanitizzati a mano.
+**Segreti:** nessun valore in chiaro nel repo. Solo riferimenti `op://vault/item/field` risolti a runtime con 1Password CLI/Connect, o segreti applicativi su Infisical (ADR-007). Gitleaks come pre-commit hook (repo locale e checkout su `pve-management`) è rete di sicurezza aggiuntiva, non la difesa primaria — CI su GitHub ancora da impostare. Attenzione anche a segreti "impliciti": IP pubblici, MAC address, coordinate GPS in config Home Assistant, serial number nei log — vanno sanitizzati a mano. Anche identificativi non tecnicamente segreti ma specifici di una risorsa reale (es. un id di vault) vanno evitati come default hardcoded in script versionati — vedi ADR-006.
 
 **Niente emoji nella documentazione.** README, ADR, note del vault e diagrammi non usano emoji decorative (né nei titoli né nelle tabelle di stato): testo semplice, più professionale e stabile per anchor e rendering. Le frecce tipografiche (`→`, `↔`) e i simboli tecnici non sono emoji e restano ammessi.
 
 ## Domande aperte / decisioni non ancora prese
 
-- `adguardhome-sync`: modalità cron o webhook? (da decidere)
-- Piano 1Password dell'utente (Personal/Family/Business) — determina se usare Connect o solo Service Accounts + CLI nelle fasi iniziali
+- `adguardhome-sync`: modalità cron o webhook? (da decidere — per un caso analogo, il deploy automatico dei docker-compose, si è scelto polling via timer systemd invece di webhook, vedi ADR-008: stesso ragionamento probabilmente applicabile anche qui)
 - Autenticazione VRRP tra i nodi Keepalived (consigliata, da verificare se già impostata)
 
 ## Roadmap (fasi)
 
-1. **Fatto** — Documentazione architetturale e primi ADR
-2. **Da fare** — Docker Compose versionato e sanitizzato per tutti i servizi + MkDocs/Pages
-3. **Da fare** — Ansible playbook per i 3 nodi
-4. **Da fare** — OpenTofu per provisioning Proxmox
-5. **Da fare** — Migrazione secret management su 1Password Connect
-6. **Da fare** — Cluster k8s gestito in GitOps con Flux
+1. **Fatto** — Documentazione architetturale e ADR (000, 001, 002, 005, 006, 007, 008 — 003/004 ancora in programmazione)
+2. **Fatto per `dell-emc`** — OpenTofu per provisioning Proxmox (`Docker-100`, `Traefik-110`) — `hp-laptop`/`thinkcentre` ancora da fare
+3. **Fatto per `dell-emc`** — Ansible playbook — stessa estensione mancante
+4. **Fatto per `dell-emc`** — Migrazione secret management su 1Password Connect + Infisical, in produzione
+5. **Fatto per `dell-emc`** — Docker Compose versionato e sanitizzato (`docker-compose/`), aggiornamenti automatici con Renovate, deploy automatico via timer systemd — Region A ancora da versionare
+6. **Da fare** — MkDocs Material + GitHub Pages
+7. **Da fare** — CI reale su GitHub Actions (gitleaks già attivo solo come pre-commit hook locale)
+8. **Da fare** — Cluster k8s gestito in GitOps con Flux
 
 ## Tono e stile richiesti nella documentazione
 
