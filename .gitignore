@@ -76,6 +76,11 @@ ansible/collections/
 docker/**/data/
 docker/**/pgdata/
 docker/**/meili_data/
+# Semaphore: config/ contiene config.json generato al primo avvio con segreti
+# crittografici reali (cookie_hash, cookie_encryption, access_key_encryption),
+# tmp/ è scratch space runtime — nessuno dei due è config da versionare.
+docker/Semaphore/config/
+docker/Semaphore/tmp/
 docker/**/volumes/
 docker/**/*.log
 

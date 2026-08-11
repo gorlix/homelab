@@ -1,0 +1,27 @@
+# Gira su pve-management, lo stesso host da cui partono Ansible/OpenTofu — non
+# è un target del gruppo docker_nodes (Docker-100/Traefik-110), quindi non passa
+# dal ruolo docker_service/infisical_secrets che genera .env automaticamente ad
+# ogni deploy. Stessa situazione di 1password-connect/infisical: i segreti
+# vivono comunque su Infisical (cartella /Semaphore, ambiente prod), ma l'.env
+# va materializzato a mano su questo host con la CLI Infisical invece che dal
+# flusso Ansible automatico. Vedi .env.example per le chiavi richieste.
+services:
+    Semaphore:
+        ports:
+            - 3000:3000
+        image: semaphoreui/semaphore:v2.18.27
+        env_file: .env
+        environment:
+            SEMAPHORE_DB_DIALECT: sqlite
+            SEMAPHORE_ADMIN: admin
+            SEMAPHORE_ADMIN_NAME: Admin
+            SEMAPHORE_ADMIN_EMAIL: admin@admin.local
+            SEMAPHORE_USE_REMOTE_RUNNER: "True"
+            SEMAPHORE_GOTIFY_ALERT: "True"
+            SEMAPHORE_GOTIFY_URL: "gotrify.alessandrogorla.it"
+        volumes:
+            - ./data:/var/lib/semaphore
+            - ./config:/etc/semaphore
+            - ./tmp:/tmp/semaphore
+            - /opt/infrastructure/ansible:/opt/infrastructure/ansible:ro
+            - /opt/infrastructure/opentofu:/opt/infrastructure/opentofu:ro
