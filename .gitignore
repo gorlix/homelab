@@ -1,3 +1,28 @@
+# infrastructure/ (es. /opt/infrastructure su pve-management) è la copia di
+# LAVORO di ansible/+opentofu/ usata per l'esecuzione effettiva (inventory
+# generato, collection installate, virtualenv, backup locali) — non contenuto
+# originale, mai versionata per intero.
+infrastructure/
+
+# docker-compose/ (es. /opt/docker-compose su pve-management) è invece la
+# cartella dove girano DAVVERO i servizi: a differenza di infrastructure/, i
+# suoi docker-compose.yml per-servizio DEVONO poter essere tracciati (sono la
+# stessa cosa concettualmente della copia in docker/, semplicemente sull'host
+# reale) — solo dati/segreti runtime dentro vanno esclusi, non l'intera
+# cartella. "docker/**/data/" più sotto protegge solo l'albero docker/ del
+# repository, non docker-compose/ (nome diverso): stesse regole ripetute qui,
+# verificate una per una con `git check-ignore`, non assunte per simmetria.
+docker-compose/**/data/
+docker-compose/**/pgdata/
+docker-compose/**/meili_data/
+docker-compose/**/volumes/
+docker-compose/**/*.log
+# Semaphore (vedi ADR/commit: segreti reali in chiaro nell'environment del
+# container, non ancora sistemato) — config/ e data/ contengono lo stato e i
+# segreti reali dell'istanza, non config da versionare.
+docker-compose/Semaphore/config/
+docker-compose/Semaphore/data/
+
 # Segreti e credenziali
 .env
 .env.*
