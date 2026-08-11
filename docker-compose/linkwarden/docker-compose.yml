@@ -3,7 +3,13 @@
 # ruolo Ansible infisical_secrets + docker_service, non versionati qui.
 services:
   postgres:
-    image: postgres:18-alpine
+    # Bump automatico a 18-alpine (major, 16->18) da un merge Renovate non
+    # ancora dispiegato: lo stesso bump su infisical-db (14->18) ha mandato
+    # giù il servizio per davvero l'11/08/2026 (Postgres 18+ richiede
+    # pg_upgrade reale, non basta cambiare il tag immagine). Non ancora
+    # dispiegato qui — revertito preventivamente prima che succeda la stessa
+    # cosa. Vedi packageRules in renovate.json per il fix strutturale.
+    image: postgres:16-alpine
     env_file: .env
     restart: always
     volumes:
@@ -26,7 +32,13 @@ services:
     extra_hosts:
       - "auth.alessandrogorla.it:192.168.10.107"
   meilisearch:
-    image: getmeili/meilisearch:v1.53.0
+    # Salto enorme (v1.12.8 -> v1.53.0, 40+ minor) proposto dallo stesso merge
+    # Renovate del bump di postgres qui sopra, che ha già rotto un altro
+    # servizio (infisical-db). Nessuna verifica fatta sulla compatibilità del
+    # formato indice tra versioni così distanti — revertito per precauzione,
+    # non per certezza che romperebbe qualcosa. Va aggiornato deliberatamente,
+    # non lasciato passare in un merge automatico.
+    image: getmeili/meilisearch:v1.12.8
     restart: always
     env_file:
       - .env

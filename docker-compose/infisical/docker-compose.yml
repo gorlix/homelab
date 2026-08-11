@@ -33,7 +33,16 @@ services:
 
   db:
     container_name: infisical-db
-    image: postgres:18-alpine
+    # Bump automatico a 18-alpine (major) da Renovate fatto girare a mano il
+    # 11/08/2026: infisical-db non è mai ripartito ("Error: in 18+, these
+    # Docker images are configured to store database data in a format which
+    # is compatible with pg_ctlcluster... appears to be PostgreSQL data in
+    # /var/lib/postgresql/data" — 14 -> 18 richiede pg_upgrade reale, non basta
+    # cambiare il tag immagine). Rollback immediato per ripristinare il
+    # servizio; l'upgrade major va fatto deliberatamente con backup e
+    # pg_upgrade, non lasciato a un merge automatico di Renovate. Vedi
+    # packageRules in renovate.json per il fix strutturale.
+    image: postgres:14-alpine
     restart: always
     env_file: .env
     volumes:

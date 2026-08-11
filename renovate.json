@@ -2,5 +2,14 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
   "timezone": "Europe/Rome",
-  "schedule": ["before 6am on monday"]
+  "schedule": ["before 6am on monday"],
+  "packageRules": [
+    {
+      "description": "Immagini stateful (database/motori di ricerca): un major bump automatico di postgres su infisical-db (14 -> 18) ha mandato giù il servizio l'11/08/2026 — Postgres 18+ richiede pg_upgrade reale, non basta cambiare il tag immagine. Major update per queste immagini richiedono un click esplicito sulla Dependency Dashboard invece di aprire una PR da sola; minor/patch restano automatici.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["postgres", "getmeili/meilisearch", "redis", "influxdb"],
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    }
+  ]
 }
