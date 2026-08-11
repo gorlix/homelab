@@ -68,7 +68,8 @@ homelab/
 ├── opentofu/
 │   └── nodes/{dell-emc,hp-laptop,thinkcentre}/
 ├── ansible/
-├── docker/
+├── docker-compose/             # stessa cartella, stesso nome, dei nodi reali (es. /opt/docker-compose
+│   │                           # su pve-management) — tracciata direttamente, non una copia separata
 │   ├── traefik/
 │   ├── adguard/
 │   │   ├── keepalived/

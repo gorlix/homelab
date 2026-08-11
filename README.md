@@ -181,7 +181,8 @@ homelab/
 ├── opentofu/                  # provisioning VM/LXC su Proxmox
 │   └── nodes/{dell-emc,hp-laptop,thinkcentre}/
 ├── ansible/                   # configurazione OS e deploy
-├── docker/                    # docker-compose per ogni stack
+├── docker-compose/             # docker-compose per ogni stack — stesso nome/path
+│   │                           # dei nodi reali, tracciata direttamente
 │   ├── traefik/
 │   ├── adguard/
 │   ├── frigate/

@@ -4,24 +4,26 @@
 # originale, mai versionata per intero.
 infrastructure/
 
-# docker-compose/ (es. /opt/docker-compose su pve-management) è invece la
-# cartella dove girano DAVVERO i servizi: a differenza di infrastructure/, i
-# suoi docker-compose.yml per-servizio DEVONO poter essere tracciati (sono la
-# stessa cosa concettualmente della copia in docker/, semplicemente sull'host
-# reale) — solo dati/segreti runtime dentro vanno esclusi, non l'intera
-# cartella. "docker/**/data/" più sotto protegge solo l'albero docker/ del
-# repository, non docker-compose/ (nome diverso): stesse regole ripetute qui,
-# verificate una per una con `git check-ignore`, non assunte per simmetria.
+# docker-compose/ (es. /opt/docker-compose su pve-management) è la cartella
+# dove girano DAVVERO i servizi — ed è anche la fonte di verità tracciata da
+# questo repository (non una copia separata: si traccia direttamente qui,
+# decisione esplicita per evitare due posti con lo stesso contenuto). Solo
+# dati/segreti runtime dentro ogni servizio vanno esclusi, non la cartella
+# intera. Ogni pattern verificato con `git check-ignore`, non assunto per
+# simmetria — se un servizio futuro monta una cartella dati con un nome nuovo,
+# va aggiunta qui esplicitamente, non dato per scontato che "data/" basti.
 docker-compose/**/data/
 docker-compose/**/pgdata/
 docker-compose/**/meili_data/
 docker-compose/**/volumes/
 docker-compose/**/*.log
-# Semaphore (vedi ADR/commit: segreti reali in chiaro nell'environment del
-# container, non ancora sistemato) — config/ e data/ contengono lo stato e i
-# segreti reali dell'istanza, non config da versionare.
+# Semaphore: config/ contiene config.json generato al primo avvio con segreti
+# crittografici reali (cookie_hash, cookie_encryption, access_key_encryption),
+# data/ e tmp/ sono stato/scratch runtime — niente di questo è config da
+# versionare (vedi commit di sanitizzazione per i dettagli).
 docker-compose/Semaphore/config/
 docker-compose/Semaphore/data/
+docker-compose/Semaphore/tmp/
 
 # Segreti e credenziali
 .env
@@ -67,22 +69,6 @@ ansible/inventory.yml
 ansible/collections/
 # virtualenv di bootstrap per l'SDK 1Password Connect (roles/onepassword_bootstrap)
 .venv-1password/
-
-# Docker
-# Stato/dati runtime dei bind mount definiti nei docker-compose.yml versionati
-# (mai la stessa cartella per due servizi diversi, i nomi seguono quello che c'è
-# davvero nei volumes: di ciascun docker-compose.yml — se un servizio futuro
-# monta una cartella dati con un nome nuovo, va aggiunta qui esplicitamente).
-docker/**/data/
-docker/**/pgdata/
-docker/**/meili_data/
-# Semaphore: config/ contiene config.json generato al primo avvio con segreti
-# crittografici reali (cookie_hash, cookie_encryption, access_key_encryption),
-# tmp/ è scratch space runtime — nessuno dei due è config da versionare.
-docker/Semaphore/config/
-docker/Semaphore/tmp/
-docker/**/volumes/
-docker/**/*.log
 
 # Home Assistant (contiene dati sensibili di posizione/rete)
 home-assistant/secrets.yaml

@@ -18,12 +18,12 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./dynamic:/etc/traefik/dynamic:ro
     ports:
-      # Pubblicata sull'host: il tunnel Cloudflare ha DUE connector attivi sullo
-      # stesso tunnel (quello vecchio su pve bare-metal + questo su Traefik-110)
-      # e load-bilancia tra loro. Un nome Docker interno come "traefik:80" risolve
-      # solo dal connector su QUESTO host; un IP:porta pubblicato funziona da
-      # entrambi, stesso pattern di ogni altra route già configurata su questo
-      # tunnel (tutte per IP, nessuna per nome container).
+      # Pubblicata sull'host invece di usare il nome Docker interno "traefik:80":
+      # il connector cloudflared di QUESTO host è l'unico rimasto sul tunnel (il
+      # vecchio connector bare-metal su `pve`, causa dell'esposizione del token
+      # originale, è stato terminato l'11/08/2026 dopo la rotazione — vedi ADR-006)
+      # ma un IP:porta pubblicato resta comunque più robusto di un nome Docker
+      # interno se in futuro tornasse a esserci più di un connector attivo.
       - "80:80"
     networks:
       - traefik_proxy
