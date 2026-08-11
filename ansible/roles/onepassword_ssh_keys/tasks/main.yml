@@ -1,0 +1,79 @@
+---
+# Registra su 1Password (via Connect) la coppia di chiavi SSH che OpenTofu ha appena
+# generato per ciascun container. container_ssh_keys arriva come extra-var da
+# terraform_data.run_ansible (opentofu/nodes/dell-emc/main.tf), letto da un file
+# temporaneo su tmpfs che Tofu distrugge subito dopo questo play.
+#
+# API REST diretta (ansible.builtin.uri), non il modulo onepassword.connect.
+# generic_item: verificato dal vivo che il modulo rifiuta "ssh_key" come
+# categoria ("value of category must be one of: login, password, server,
+# database, ... " — SSH_KEY non compare), anche se la REST API di Connect la
+# supporta davvero (confermato su www.1password.dev/connect/api-reference#add-an-item).
+# La categoria è IMMUTABILE dopo la creazione — cambiarla via PATCH viene
+# rifiutato, via PUT viene silenziosamente ignorata, verificato dal vivo — quindi
+# l'unico modo corretto è: se esiste già un item con lo stesso titolo, cancellarlo
+# e ricrearlo da zero con la categoria giusta, non aggiornarlo sul posto.
+# Vedi ADR-006 per l'elenco completo delle categorie usate in questo repository.
+
+- name: Verifica che onepassword_vault_id sia stato passato
+  ansible.builtin.assert:
+    that:
+      - onepassword_vault_id is defined
+      - onepassword_vault_id | length > 0
+    fail_msg: >-
+      onepassword_vault_id mancante: passalo con -e onepassword_vault_id=<uuid-vault>
+      (vedi variables.tf per come ottenere l'UUID dal Connect server).
+
+- name: Elenca gli item esistenti nel vault (per capire se un titolo va ricreato)
+  ansible.builtin.uri:
+    url: "{{ lookup('env', 'OP_CONNECT_HOST') | default('http://localhost:8080', true) }}/v1/vaults/{{ onepassword_vault_id }}/items"
+    headers:
+      Authorization: "Bearer {{ lookup('env', 'OP_CONNECT_TOKEN') }}"
+    return_content: true
+  register: onepassword_existing_items
+  no_log: true
+
+- name: Cancella l'item esistente con lo stesso titolo, se già presente
+  # NON usare `| default(omit)` dentro `vars:` per poi testarlo con `is defined`
+  # in `when:` — verificato dal vivo che non funziona: `omit` è un segnaposto
+  # valido solo come valore diretto di un parametro di modulo, altrove si
+  # comporta come una stringa qualsiasi (sempre "defined"), quindi il task
+  # scattava per OGNI item anche senza nessun match, fallendo su `.id` perché il
+  # valore era una stringa e non un dict. Fix: verificare la lunghezza della
+  # lista dei match, non l'esistenza di un `default(omit)`.
+  ansible.builtin.uri:
+    url: "{{ lookup('env', 'OP_CONNECT_HOST') | default('http://localhost:8080', true) }}/v1/vaults/{{ onepassword_vault_id }}/items/{{ onepassword_existing_matches[0].id }}"
+    method: DELETE
+    headers:
+      Authorization: "Bearer {{ lookup('env', 'OP_CONNECT_TOKEN') }}"
+    status_code: [200, 204]
+  loop: "{{ container_ssh_keys | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  vars:
+    onepassword_existing_matches: "{{ onepassword_existing_items.json | selectattr('title', 'equalto', item.value.op_item_title) | list }}"
+  when: onepassword_existing_matches | length > 0
+  no_log: true
+
+- name: Crea l'item SSH_KEY per ciascun container
+  ansible.builtin.uri:
+    url: "{{ lookup('env', 'OP_CONNECT_HOST') | default('http://localhost:8080', true) }}/v1/vaults/{{ onepassword_vault_id }}/items"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ lookup('env', 'OP_CONNECT_TOKEN') }}"
+    body_format: json
+    body:
+      title: "{{ item.value.op_item_title }}"
+      category: SSH_KEY
+      fields:
+        - label: private_key
+          value: "{{ item.value.private_key }}"
+          type: CONCEALED
+        - label: public_key
+          value: "{{ item.value.public_key }}"
+          type: STRING
+    status_code: [200, 201]
+  loop: "{{ container_ssh_keys | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  no_log: true

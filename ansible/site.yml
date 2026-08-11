@@ -1,0 +1,123 @@
+---
+# FASE 0: Bootstrap ambiente 1Password Connect sul controller (pve-management).
+# La collection onepassword.connect NON si installa qui come task: Ansible risolve
+# staticamente tutti i moduli usati nel playbook prima di eseguire il primo task
+# (verificato eseguendo questo file senza la collection già installata: fallisce
+# subito con "couldn't resolve module/action", ancora prima di provare a girare
+# Fase 0). Va installata da fuori, prima di invocare ansible-playbook: vedi
+# run.sh e il provisioner in opentofu/nodes/dell-emc/main.tf.
+#
+# tag "onepassword" su questo e sul prossimo play: permette di rieseguire solo la
+# parte 1Password (`ansible-playbook site.yml --tags onepassword`) senza toccare
+# nessun host reale. Necessario perché "--limit localhost" NON funziona qui: --limit
+# filtra sui host dichiarati in inventory.yml, dove "localhost" non compare mai
+# (è un pattern speciale valido solo dentro "hosts:", non un host di inventory) —
+# verificato: con --limit localhost il preflight fallisce con "no hosts to target"
+# anche se i play sotto usano "hosts: localhost".
+- name: Bootstrap ambiente 1Password Connect
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [onepassword]
+  roles:
+    - onepassword_bootstrap
+
+# FASE 0.5: Registra su 1Password le chiavi SSH appena generate da OpenTofu.
+# container_ssh_keys arriva come extra-var (-e @secrets_file) solo quando questo
+# playbook è invocato dal provisioner Tofu; un `run.sh` manuale senza quell'extra-var
+# salta questo play invece di fallire, per poter rieseguire Fase 1/2 su host già
+# esistenti senza dover rigenerare chiavi.
+- name: Registra le chiavi SSH generate su 1Password
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [onepassword]
+  tasks:
+    - name: Salta se non invocato da OpenTofu (container_ssh_keys non definito)
+      ansible.builtin.debug:
+        msg: "container_ssh_keys non passato come extra-var: nessuna chiave da registrare in questo run."
+      when: container_ssh_keys is not defined
+  roles:
+    - role: onepassword_ssh_keys
+      when: container_ssh_keys is defined
+
+# FASE 0.6: percorso "recovery" per run standalone (non innescati da OpenTofu):
+# recupera da 1Password la chiave SSH di ogni nodo e la carica nell'ssh-agent che
+# run.sh ha già avviato, così Fase 1/2 possono connettersi senza dover passare da
+# un tofu apply. Quando invece è OpenTofu a invocare questo playbook, la chiave è
+# già nell'agent (ssh-add fatto nel local-exec) e container_ssh_keys è definito:
+# in quel caso questo play è ridondante, quindi salta.
+- name: Carica le chiavi SSH dei nodi da 1Password (solo se non fornite da OpenTofu)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [onepassword]
+  roles:
+    - role: onepassword_ssh_agent
+      when: container_ssh_keys is not defined
+
+# FASE 0.7: Recupera i segreti applicativi da Infisical (vedi ADR-007) usando
+# l'identità ansible-automation, le cui credenziali arrivano da 1Password — 1Password
+# tiene le "chiavi per entrare" in Infisical, Infisical tiene i segreti applicativi
+# veri e propri (es. il token di Hawser, usato in Fase 1). Fact impostati qui su
+# localhost restano leggibili da Fase 1/2 tramite hostvars['localhost'].
+- name: Recupera i segreti applicativi da Infisical
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  roles:
+    - infisical_secrets
+
+# FASE 1: Setup comune su TUTTI i nodi del cluster/infrastruttura
+#
+# gather_facts esplicitamente a false: è un implicit task taggato "always" da
+# Ansible, quindi girerebbe (tentando una connessione reale agli host) anche con
+# --tags onepassword, che dovrebbe escludere questo play per intero (verificato:
+# senza questo false, `--tags onepassword` prova comunque a connettersi a
+# Docker-100 per il gather facts prima di scoprire che nessun task combacia).
+# roles/common non legge ansible_facts, quindi disabilitarlo non cambia nulla
+# nell'esecuzione normale.
+- name: Applicazione Setup Base su tutti i nodi
+  hosts: all
+  become: true
+  gather_facts: false
+  roles:
+    - common
+    - hawser
+
+# FASE 2: Deploy dei servizi Docker specifici sulle rispettive macchine
+#
+# hosts: docker_nodes, non pve_100 — bug preesistente trovato durante il lavoro su
+# ADR-006: pve_100 non è mai esistito come gruppo in inventory.yml (che definisce
+# docker_nodes/Docker-100, generato da opentofu/nodes/dell-emc/main.tf), quindi
+# questa fase non ha mai girato per davvero. Corretto per farla combaciare con
+# l'inventory reale.
+#
+# services non è più una lista unica valida per tutto il gruppo: da quando esiste
+# più di un nodo docker_nodes con scopi diversi (Docker-100 fa servizi applicativi,
+# Traefik-110 fa solo Traefik), ogni host porta la propria lista come host var
+# nell'inventory generato da OpenTofu (containers[*].services in variables.tf) — il
+# loop qui sotto la legge automaticamente dal contesto dell'host in esecuzione,
+# senza bisogno di hostvars[inventory_hostname] esplicito.
+- name: Deploy Servizi Docker sui nodi
+  hosts: docker_nodes
+  become: true
+  gather_facts: false
+  tasks:
+    # Rete condivisa che Traefik e cloudflared usano per parlarsi (stesso host).
+    # community.docker non è installata (nessun altro punto del repo ne ha ancora
+    # bisogno): un comando diretto con failed_when tollerante evita di aggiungere
+    # una collection solo per questo.
+    - name: Crea la rete Docker condivisa traefik_proxy (se questo host esegue Traefik)
+      ansible.builtin.command: docker network create traefik_proxy
+      register: traefik_net
+      failed_when: traefik_net.rc != 0 and 'already exists' not in traefik_net.stderr
+      changed_when: traefik_net.rc == 0
+      when: "'traefik' in services"
+
+    - name: Copia cartella del servizio ed esegui Compose
+      include_role:
+        name: docker_service
+      loop: "{{ services }}"
+      loop_control:
+        loop_var: service_name

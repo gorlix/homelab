@@ -1,0 +1,62 @@
+---
+- name: Aggiorna tutti i pacchetti di sistema
+  dnf:
+    name: '*'
+    state: latest
+
+- name: Abilita EPEL (richiesto da htop su Rocky/RHEL, non è nei repo di base)
+  dnf:
+    name: epel-release
+    state: present
+
+- name: Installa pacchetti di utility essenziali
+  dnf:
+    name:
+      - curl
+      - wget
+      - git
+      - htop
+      - tar
+      - unzip
+      - tmux
+    state: present
+
+# qemu-guest-agent NON va qui: richiede un device virtio-serial che esiste solo
+# sulle VM QEMU/KVM vere. Questi target sono container LXC
+# (proxmox_virtual_environment_container in opentofu/nodes/dell-emc/main.tf), non
+# VM — l'unità systemd non parte mai per un dependency job fallito (verificato: il
+# primo tofu apply che ha superato l'installazione pacchetti si è fermato proprio
+# qui). L'integrazione LXC-Proxmox non passa da questo agente.
+
+- name: Aggiungi il repository ufficiale Docker
+  get_url:
+    url: https://download.docker.com/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+
+- name: Installa Docker e Docker Compose Plugin
+  dnf:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+    state: present
+
+- name: Assicura che il servizio Docker sia avviato ed abilitato
+  systemd:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Configura .tmux.conf base
+  copy:
+    dest: /root/.tmux.conf
+    content: |
+      # Abilita supporto mouse per scroll e selezione pane
+      set -g mouse on
+      # Start numbering at 1
+      set -g base-index 1
+      setw -g pane-base-index 1
+      # History limit generoso
+      set -g history-limit 10000
+    mode: '0644'

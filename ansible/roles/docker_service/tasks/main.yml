@@ -1,0 +1,27 @@
+---
+- name: Assicura che la directory /opt/{{ service_name }} esista sulla target
+  file:
+    path: "/opt/{{ service_name }}"
+    state: directory
+    mode: '0755'
+
+- name: Copia la cartella del servizio (compose + eventuali conf, MAI .env se migrato su Infisical)
+  copy:
+    src: "/opt/docker-compose/{{ service_name }}/"
+    dest: "/opt/{{ service_name }}/"
+    mode: '0644'
+
+- name: Genera .env da Infisical (servizi migrati — vedi infisical_secrets/defaults)
+  # Se service_name non è tra i migrati, questo task salta e resta valido il .env
+  # statico copiato dal task sopra (se presente nella cartella sorgente).
+  copy:
+    dest: "/opt/{{ service_name }}/.env"
+    content: "{{ hostvars['localhost'].service_envs[service_name] }}"
+    mode: '0600'
+  when: service_name in (hostvars['localhost'].service_envs | default({}))
+  no_log: true
+
+- name: Avvia lo stack Docker Compose
+  command: docker compose up -d
+  args:
+    chdir: "/opt/{{ service_name }}"

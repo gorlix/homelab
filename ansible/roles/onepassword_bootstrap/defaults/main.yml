@@ -1,0 +1,5 @@
+---
+# Percorso del virtualenv usato SOLO se il pacchetto di sistema non è disponibile via
+# dnf. Fuori dalla repo (mai in ansible/ o terraform/): è stato del controller, non
+# codice, e non deve mai finire su git (vedi .gitignore).
+onepassword_venv_path: /opt/infrastructure/.venv-1password

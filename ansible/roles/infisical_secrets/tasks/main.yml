@@ -1,0 +1,103 @@
+---
+# Recupera dall'identità Infisical "ansible-automation" (Universal Auth, ruolo
+# member sul progetto "Homelab Env") i secret applicativi che i ruoli successivi
+# useranno per configurare i servizi sui nodi reali. Gira UNA volta su localhost,
+# prima di Fase 1: i fact impostati qui restano leggibili da altre play nello
+# stesso run tramite hostvars['localhost'], senza bisogno di rifare login/fetch
+# per ogni host target (vedi ADR-007: 1Password tiene le chiavi per entrare in
+# Infisical, Infisical tiene i segreti applicativi).
+#
+# Struttura del ritorno di item_info verificata dal vivo (non presa per buona
+# dalla documentazione, che su questo punto si è già rivelata imprecisa una
+# volta in questa stessa sessione): op_item.fields.<label>.value, non
+# op_item.fields.<label> direttamente.
+
+- name: Recupera le credenziali dell'identità ansible-automation da 1Password
+  onepassword.connect.item_info:
+    hostname: "{{ lookup('env', 'OP_CONNECT_HOST') | default('http://localhost:8080', true) }}"
+    token: "{{ lookup('env', 'OP_CONNECT_TOKEN') }}"
+    vault: "{{ onepassword_vault_id }}"
+    item: "Infisical Ansible Identity - ansible-automation"
+  register: infisical_identity_item
+  no_log: true
+  vars:
+    ansible_python_interpreter: "{{ onepassword_python_interpreter }}"
+
+- name: Login a Infisical con l'identità ansible-automation (universal-auth)
+  ansible.builtin.command:
+    cmd: >
+      infisical login --method=universal-auth
+      --client-id={{ infisical_identity_item.op_item.fields.client_id.value }}
+      --client-secret={{ infisical_identity_item.op_item.fields.client_secret.value }}
+      --domain={{ infisical_identity_item.op_item.fields.site_url.value }}/api
+      --plain --silent
+  register: infisical_login
+  no_log: true
+  changed_when: false
+
+- name: Rendi disponibili come fact i parametri comuni per i fetch successivi
+  ansible.builtin.set_fact:
+    infisical_access_token: "{{ infisical_login.stdout }}"
+    infisical_project_id: "{{ infisical_identity_item.op_item.fields.project_id.value }}"
+    infisical_domain: "{{ infisical_identity_item.op_item.fields.site_url.value }}/api"
+  no_log: true
+
+- name: Recupera il token Hawser di ciascun nodo (Standard/local mode — un token per host, non condiviso)
+  # Hawser in modalità Edge (token unico condiviso, emesso da Dockhand) è stato
+  # scartato: con più host sullo stesso token, Dockhand tratta ogni nuova
+  # connessione come un rimpiazzo della precedente ("websocket close: Replaced"),
+  # verificato dal vivo — i due agent si scalzavano a vicenda in loop. In modalità
+  # Standard ogni host genera/porta il proprio token (qui via openssl, come da
+  # documentazione ufficiale del progetto) ed è Dockhand a connettersi in uscita
+  # verso ciascun agent: nessuno slot condiviso, nessun conflitto. Ogni token vive
+  # nella sua cartella per-host in Infisical (/<nome-host>/HAWSER_TOKEN).
+  ansible.builtin.command:
+    cmd: >
+      infisical secrets get HAWSER_TOKEN
+      --token={{ infisical_access_token }}
+      --domain={{ infisical_domain }}
+      --projectId={{ infisical_project_id }}
+      --env=prod
+      --path=/{{ item }}
+      -o json
+  loop: "{{ groups['docker_nodes'] | default([]) }}"
+  register: hawser_token_results
+  no_log: true
+  changed_when: false
+
+- name: Esponi hawser_tokens (dict nome-host -> token) per il ruolo hawser
+  # stdout_lines[-1], non stdout: la CLI stampa su stdout (non stderr) un warning
+  # su "logged-in session overwritten" prima del JSON quando si passa --token
+  # esplicito — verificato dal vivo, non deducibile dalla sola documentazione.
+  ansible.builtin.set_fact:
+    hawser_tokens: "{{ hawser_tokens | default({}) | combine({item.item: (item.stdout_lines[-1] | from_json)[0].secretValue}) }}"
+  loop: "{{ hawser_token_results.results }}"
+  no_log: true
+
+- name: Esporta il .env di ciascun servizio già migrato su Infisical
+  # `infisical export` (non `secrets get`, che richiede nomi espliciti e non sa
+  # dare "tutto quello che c'è in una cartella") — a differenza di `secrets get
+  # -o json`, manda il warning "session overwritten" su stderr, non stdout:
+  # verificato dal vivo, stdout è dotenv puro senza bisogno del trucco
+  # stdout_lines[-1]. failed_when: false perché un servizio non ancora migrato
+  # (cartella Infisical inesistente) non deve bloccare l'intero run: docker_service
+  # ricade sul .env statico esistente per quei casi.
+  ansible.builtin.command:
+    cmd: >
+      infisical export --path=/{{ item }} --env=prod
+      --token={{ infisical_access_token }}
+      --domain={{ infisical_domain }}
+      --projectId={{ infisical_project_id }}
+      --format=dotenv
+  loop: "{{ infisical_migrated_services }}"
+  register: infisical_env_exports
+  no_log: true
+  changed_when: false
+  failed_when: false
+
+- name: Esponi service_envs (dict nome-servizio -> contenuto .env) per docker_service
+  ansible.builtin.set_fact:
+    service_envs: "{{ service_envs | default({}) | combine({item.item: item.stdout}) }}"
+  loop: "{{ infisical_env_exports.results }}"
+  when: item.rc == 0
+  no_log: true

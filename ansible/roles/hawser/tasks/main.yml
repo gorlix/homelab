@@ -1,0 +1,55 @@
+---
+# Agente Hawser per Dockhand, installato di default su ogni nodo che riceve Docker
+# (girato subito dopo il ruolo common nella stessa play, vedi site.yml Fase 1).
+#
+# Modalità Standard (locale), non Edge: in Edge tutti gli agent avrebbero condiviso
+# lo stesso token emesso da Dockhand per "l'ambiente", ma Dockhand tratta un
+# token/ambiente come UNO slot — verificato dal vivo con due host reali: ogni
+# nuova connessione veniva trattata come sostituzione della precedente
+# ("websocket close: Replaced"), i due agent si scalzavano a vicenda in loop
+# permanente. In Standard è l'agent ad ascoltare ed è Dockhand a connettersi in
+# uscita verso ciascun host con il SUO token (generato via openssl, un token per
+# host, salvato nella sua cartella dedicata in Infisical) — nessuno slot condiviso.
+#
+# Riferimento ufficiale verificato dal README del progetto (Finsys/hawser), non
+# dal primo risultato di ricerca trovato — quello dava nome immagine e variabili
+# d'ambiente sbagliati (fnsys/hawser invece di ghcr.io/finsys/hawser).
+
+- name: Assicura che la directory /opt/hawser esista sulla target
+  ansible.builtin.file:
+    path: /opt/hawser
+    state: directory
+    mode: '0755'
+
+- name: Genera docker-compose.yml per Hawser (modalità Standard/locale)
+  ansible.builtin.copy:
+    dest: /opt/hawser/docker-compose.yml
+    content: |
+      services:
+        hawser:
+          image: ghcr.io/finsys/hawser:0.2.26
+          container_name: hawser
+          restart: unless-stopped
+          ports:
+            - "2376:2376"
+          volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+            - /opt:/opt/hawser-stacks
+          environment:
+            STACKS_DIR: /opt/hawser-stacks
+          env_file: .env
+    mode: '0644'
+
+- name: Genera .env con il token per-host recuperato da Infisical (mai scritto nel repo)
+  ansible.builtin.copy:
+    dest: /opt/hawser/.env
+    content: |
+      TOKEN={{ hostvars['localhost'].hawser_tokens[inventory_hostname] }}
+    mode: '0600'
+  no_log: true
+
+- name: Avvia Hawser
+  ansible.builtin.command: docker compose up -d
+  args:
+    chdir: /opt/hawser
+  changed_when: true

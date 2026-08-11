@@ -1,0 +1,40 @@
+---
+# Prepara sul controller (localhost, cioè pve-management) tutto ciò che serve per
+# parlare con 1Password Connect dai task Ansible: l'SDK Python che il modulo
+# onepassword.connect.generic_item importa a runtime.
+#
+# Politica esplicita (vedi ADR-006): dnf ha SEMPRE la priorità perché un pacchetto
+# gestito da dnf resta tracciato dal package manager di sistema (aggiornamenti,
+# rimozione pulita, nessun rischio di "pip install" che scrive in siti-packages di
+# sistema e confligge con RPM). Se dnf non lo offre — atteso su Rocky/EPEL, è un
+# pacchetto di nicchia pubblicato solo su PyPI da 1Password — si ripiega su un
+# virtualenv dedicato, MAI su pip diretto nel Python di sistema: eviterebbe il
+# problema solo per spostarlo (pacchetti non tracciati da dnf, rischio di rompere
+# altri tool di sistema che dipendono dallo stesso python3, es. lo stesso ansible).
+
+- name: Verifica se python3-onepasswordconnectsdk è disponibile nei repository dnf abilitati
+  ansible.builtin.command: dnf list --available python3-onepasswordconnectsdk
+  register: onepassword_dnf_probe
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: "Installa l'SDK via dnf (pacchetto di sistema — percorso preferito)"
+  ansible.builtin.dnf:
+    name: python3-onepasswordconnectsdk
+    state: present
+  when: onepassword_dnf_probe.rc == 0
+
+- name: "Fallback: nessun pacchetto dnf disponibile, crea/aggiorna un virtualenv dedicato"
+  ansible.builtin.pip:
+    name: onepasswordconnectsdk
+    virtualenv: "{{ onepassword_venv_path }}"
+    virtualenv_command: "python3 -m venv"
+    state: present
+  when: onepassword_dnf_probe.rc != 0
+
+- name: Determina quale interprete Python useranno i task che parlano con Connect
+  ansible.builtin.set_fact:
+    onepassword_python_interpreter: >-
+      {{ (onepassword_dnf_probe.rc == 0)
+         | ternary(ansible_playbook_python, onepassword_venv_path ~ '/bin/python3') }}

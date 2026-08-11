@@ -1,0 +1,13 @@
+---
+# Servizi il cui .env è stato migrato su Infisical (cartella prod/<nome> per
+# ciascuno). Elenco esplicito invece di calcolarlo dai services host-per-host in
+# variables.tf: più semplice da leggere, e i due elenchi non devono per forza
+# coincidere (un servizio può essere nella lista di un host senza che il suo .env
+# sia ancora stato migrato — docker_service ricade sul .env statico in quel caso).
+#
+# 1password-connect e infisical stesso NON ci saranno mai: dipendenza circolare
+# reale (vedi ADR-007), i loro .env restano file locali per costruzione.
+infisical_migrated_services:
+  - traefik
+  - monitoring
+  - linkwarden

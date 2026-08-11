@@ -1,0 +1,40 @@
+---
+# Percorso "recovery": run.sh, usato da solo (senza passare da OpenTofu), non ha
+# mai avuto la chiave privata dei nodi — quella esiste solo per pochi secondi
+# nell'ssh-agent che OpenTofu avvia dentro il proprio local-exec, poi viene
+# distrutta (vedi ADR-006). Questo ruolo la recupera invece da 1Password, dove
+# onepassword_ssh_keys l'ha già salvata, e la carica nell'ssh-agent già avviato da
+# run.sh — così un run standalone (es. per ripushare un docker-compose aggiornato)
+# funziona senza dover forzare un tofu apply -replace.
+
+- name: Verifica che onepassword_vault_id sia stato passato
+  ansible.builtin.assert:
+    that:
+      - onepassword_vault_id is defined
+      - onepassword_vault_id | length > 0
+    fail_msg: >-
+      onepassword_vault_id mancante: passalo con -e onepassword_vault_id=<uuid-vault>.
+
+- name: Recupera dal vault la chiave privata SSH di ciascun nodo target
+  onepassword.connect.item_info:
+    hostname: "{{ lookup('env', 'OP_CONNECT_HOST') | default('http://localhost:8080', true) }}"
+    token: "{{ lookup('env', 'OP_CONNECT_TOKEN') }}"
+    vault: "{{ onepassword_vault_id }}"
+    item: "{{ hostvars[item].op_item_title }}"
+    field: private_key
+  loop: "{{ groups['docker_nodes'] | default([]) }}"
+  register: onepassword_ssh_agent_fetched
+  no_log: true
+  vars:
+    ansible_python_interpreter: "{{ onepassword_python_interpreter }}"
+
+- name: Carica ogni chiave privata recuperata nell'ssh-agent già avviato da run.sh
+  ansible.builtin.command:
+    cmd: ssh-add -
+    stdin: "{{ fetched.field }}"
+  loop: "{{ onepassword_ssh_agent_fetched.results }}"
+  loop_control:
+    loop_var: fetched
+    label: "{{ fetched.item }}"
+  no_log: true
+  changed_when: true
