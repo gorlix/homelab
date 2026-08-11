@@ -16,6 +16,14 @@ services:
       RENOVATE_REPOSITORIES: '["gorlix/homelab"]'
       RENOVATE_ONBOARDING: "false"
       RENOVATE_REQUIRE_CONFIG: optional
+      # Fa creare i commit tramite l'API di GitHub invece che con git in locale
+      # nel container: GitHub firma/marca automaticamente questi commit come
+      # "Verified", senza dover gestire una vera chiave GPG/SSH per il bot.
+      # Un limite noto (non nostro, di GitHub): se una PR viene mergiata con
+      # strategia "rebase" il commit di merge risultante NON risulta firmato —
+      # workaround noto è disabilitare il rebase merge nelle impostazioni del
+      # repo, non ancora fatto qui.
+      RENOVATE_PLATFORM_COMMIT: enabled
     entrypoint:
       - sh
       - -c
