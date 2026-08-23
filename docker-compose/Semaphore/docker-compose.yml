@@ -9,7 +9,7 @@ services:
     Semaphore:
         ports:
             - 3000:3000
-        image: semaphoreui/semaphore:v2.19.7
+        image: semaphoreui/semaphore:v2.19.8
         env_file: .env
         environment:
             SEMAPHORE_DB_DIALECT: sqlite
