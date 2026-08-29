@@ -37,7 +37,7 @@ done
 
 # Servizi sui nodi remoti (Docker-100, Traefik-110): run.sh è già idempotente
 # e include hawser (girato sempre) + tutti i servizi elencati per host in
-# opentofu/nodes/dell-emc/variables.tf.
+# infrastructure/opentofu/nodes/dell-emc/variables.tf.
 (cd /opt/infrastructure/ansible && ./run.sh)
 
 # Controllo finale, non un vero rollback automatico: se qualcosa è rimasto

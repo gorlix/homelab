@@ -180,9 +180,12 @@ homelab/
 ├── renovate.json              # config Renovate (ADR-008)
 ├── docs/                      # documentazione estesa (MkDocs)
 │   └── adr/                   # Architecture Decision Records
-├── opentofu/                  # provisioning VM/LXC su Proxmox
-│   └── nodes/{dell-emc,hp-laptop,thinkcentre}/
-├── ansible/                   # configurazione OS e deploy
+├── infrastructure/             # ansible/+opentofu/, tracciata direttamente come
+│   │                           # docker-compose/ (ADR-008) — stesso path usato
+│   │                           # per l'esecuzione reale su pve-management.
+│   ├── opentofu/               # provisioning VM/LXC su Proxmox
+│   │   └── nodes/{dell-emc,hp-laptop,thinkcentre}/
+│   └── ansible/                # configurazione OS e deploy
 ├── scripts/                   # gitleaks hook, timer di deploy automatico (ADR-008)
 ├── .claude/skills/             # skill per scaffoldare nuovi servizi già sanitizzati
 ├── docker-compose/             # docker-compose per ogni stack — stesso nome/path

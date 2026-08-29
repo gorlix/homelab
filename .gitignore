@@ -1,8 +1,14 @@
-# infrastructure/ (es. /opt/infrastructure su pve-management) è la copia di
-# LAVORO di ansible/+opentofu/ usata per l'esecuzione effettiva (inventory
-# generato, collection installate, virtualenv, backup locali) — non contenuto
-# originale, mai versionata per intero.
-infrastructure/
+# infrastructure/{ansible,opentofu} sono la fonte di verità tracciata (stesso
+# trattamento di docker-compose/ qui sotto — vedi ADR-008, aggiornato dopo
+# aver scoperto che la versione precedente di questa nota, che escludeva
+# l'intera cartella "solo artefatti di esecuzione, niente da preservare",
+# era falsa in pratica: i .tf e i ruoli Ansible reali vivono lì). Solo gli
+# artefatti di esecuzione restano esclusi, non le due cartelle intere.
+infrastructure/ansible/inventory.yml
+infrastructure/ansible/inventory/host_vars/**/vault*.yml
+!infrastructure/ansible/inventory/host_vars/**/vault*.example.yml
+infrastructure/ansible/collections/
+infrastructure/.venv-1password/
 
 # docker-compose/ (es. /opt/docker-compose su pve-management) è la cartella
 # dove girano DAVVERO i servizi — ed è anche la fonte di verità tracciata da
@@ -59,17 +65,8 @@ override.tf.json
 terraform.rc
 .terraform.lock.hcl
 
-# Ansible
+# Ansible (path aggiornati a infrastructure/ansible/, vedi nota in testa al file)
 *.retry
-ansible/inventory/host_vars/**/vault*.yml
-!ansible/inventory/host_vars/**/vault*.example.yml
-# inventory.yml sotto ansible/nodes è generato da OpenTofu (local_file.ansible_inventory
-# in opentofu/nodes/*/main.tf), non va versionato: la fonte di verità è variables.tf
-ansible/inventory.yml
-# collection installate da requirements.yml (vedi ansible.cfg collections_path)
-ansible/collections/
-# virtualenv di bootstrap per l'SDK 1Password Connect (roles/onepassword_bootstrap)
-.venv-1password/
 
 # Home Assistant (contiene dati sensibili di posizione/rete)
 home-assistant/secrets.yaml

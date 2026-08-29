@@ -31,7 +31,7 @@ Nessuno dei tre nodi di questo homelab ha una porta in ingresso aperta verso int
 
 **Cloudflare Tunnel**: un connettore (`cloudflared`) apre una connessione in **uscita** verso l'edge di Cloudflare e riceve da lì il traffico instradato verso il dominio pubblico — nessuna porta aperta sul firewall, nessuna dipendenza da regole che non controllo. Davanti al connettore, **Traefik** fa da reverse proxy verso i servizi reali (vedi `docker-compose/traefik/`), instradando per hostname (`env.alessandrogorla.it`, `1p.alessandrogorla.it`, ...).
 
-Traefik e `cloudflared` girano insieme, nello stesso `docker-compose.yml`, sullo stesso container dedicato (`Traefik-110`, provisionato da OpenTofu — vedi `opentofu/nodes/dell-emc/`). Non è sempre stato così: **in origine `cloudflared` girava come processo diretto sull'host Proxmox bare-metal** (`pve`), avviato a mano, prima ancora che esistesse un container dedicato a Traefik. Migrato al container attuale per due motivi: isolare il connettore dal resto di quello che gira sull'host reale, e poter versionare la sua configurazione come qualunque altro servizio invece di un processo avviato a mano e mai più toccato.
+Traefik e `cloudflared` girano insieme, nello stesso `docker-compose.yml`, sullo stesso container dedicato (`Traefik-110`, provisionato da OpenTofu — vedi `infrastructure/opentofu/nodes/dell-emc/`). Non è sempre stato così: **in origine `cloudflared` girava come processo diretto sull'host Proxmox bare-metal** (`pve`), avviato a mano, prima ancora che esistesse un container dedicato a Traefik. Migrato al container attuale per due motivi: isolare il connettore dal resto di quello che gira sull'host reale, e poter versionare la sua configurazione come qualunque altro servizio invece di un processo avviato a mano e mai più toccato.
 
 ## Alternative considerate
 
@@ -61,6 +61,6 @@ Traefik e `cloudflared` girano insieme, nello stesso `docker-compose.yml`, sullo
 
 - [Cloudflare Tunnel — documentazione](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/)
 - [Cloudflare API — Cloudflare Tunnel endpoints](https://developers.cloudflare.com/api/resources/zero_trust/subresources/tunnels/subresources/cloudflare/)
-- Configurazione: [`docker-compose/traefik/`](../../docker-compose/traefik/), [`opentofu/nodes/dell-emc/`](../../opentofu/nodes/dell-emc/)
+- Configurazione: [`docker-compose/traefik/`](../../docker-compose/traefik/), [`infrastructure/opentofu/nodes/dell-emc/`](../../infrastructure/opentofu/nodes/dell-emc/)
 - [ADR-005](005-topologia-multi-sito.md) — vincolo di rete della Region B che motiva l'assenza di porte in ingresso
 - [ADR-008](008-docker-compose-management.md) — dove vive oggi la configurazione di Traefik/cloudflared, e la regola sui tool MCP di Infisical nata da questo stesso incidente

@@ -27,12 +27,12 @@ assunta):**
   di nuovo esplicitamente).
 - Segreti applicativi (password DB, token, credenziali) vivono in **Infisical**
   (self-hosted, vedi ADR-007), non in un `.env` versionato. Il ruolo Ansible
-  `ansible/roles/infisical_secrets/tasks/main.yml` fa login con l'identità
+  `infrastructure/ansible/roles/infisical_secrets/tasks/main.yml` fa login con l'identità
   `ansible-automation` (Universal Auth, credenziali in 1Password) e per ogni
-  servizio elencato in `ansible/roles/infisical_secrets/defaults/main.yml`
+  servizio elencato in `infrastructure/ansible/roles/infisical_secrets/defaults/main.yml`
   (`infisical_migrated_services`) esporta la cartella Infisical corrispondente
   come `.env` **al momento del deploy**, mai committato. Il ruolo
-  `ansible/roles/docker_service/tasks/main.yml` scrive quell'`.env` generato
+  `infrastructure/ansible/roles/docker_service/tasks/main.yml` scrive quell'`.env` generato
   solo se il servizio è in quella lista; altrimenti copia un `.env` statico se
   presente (da evitare per servizi nuovi).
 - Il progetto Infisical è **"Homelab Env"**, id `578016f6-4dc0-4507-a961-4d1e84c9be17`,
@@ -142,7 +142,7 @@ porte, flag) — stesso pattern già in uso in `docker/infisical/docker-compose.
      `environmentSlug: prod`, `secretPath: /<nome-servizio>`, `secretName`,
      `secretValue`.
 3. Registra il servizio in
-   `ansible/roles/infisical_secrets/defaults/main.yml`, lista
+   `infrastructure/ansible/roles/infisical_secrets/defaults/main.yml`, lista
    `infisical_migrated_services` (aggiungi il nome, mantieni ordine
    alfabetico se ragionevole).
 
@@ -156,8 +156,8 @@ insieme.
 ## 6. Registra il servizio per il deploy
 
 Se il servizio va su un host già provisionato da OpenTofu, aggiorna la lista
-`services` di quell'host in `opentofu/nodes/dell-emc/variables.tf`. Il deploy
-effettivo avviene poi con `opentofu/nodes/dell-emc/apply.sh apply`
+`services` di quell'host in `infrastructure/opentofu/nodes/dell-emc/variables.tf`. Il deploy
+effettivo avviene poi con `infrastructure/opentofu/nodes/dell-emc/apply.sh apply`
 (rigenera l'inventory e rilancia Ansible in modo idempotente — non serve un
 meccanismo diverso).
 
@@ -186,7 +186,7 @@ ssh pve-management 'cd /opt && git fetch origin && git reset --hard origin/main'
 
 ## 9. Deploy e verifica funzionale
 
-Esegui `opentofu/nodes/dell-emc/apply.sh apply` (chiedi conferma esplicita
+Esegui `infrastructure/opentofu/nodes/dell-emc/apply.sh apply` (chiedi conferma esplicita
 prima di un apply reale, come da prassi del repository — non è un'azione
 automatica silenziosa). Dopo il deploy, verifica che il container sia up
 (`docker ps` sull'host target) e, se il servizio espone un endpoint HTTP, che

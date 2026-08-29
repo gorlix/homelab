@@ -34,7 +34,7 @@ http:
 
     # PACA gira sulla LXC dedicata Paca-120 (192.168.10.120), isolata da
     # Docker-100 per il rischio docker.sock di agent-runner — vedi
-    # opentofu/nodes/dell-emc/variables.tf. Stesso motivo di backend statico
+    # infrastructure/opentofu/nodes/dell-emc/variables.tf. Stesso motivo di backend statico
     # cross-host di Infisical/1Password Connect sopra.
     paca:
       loadBalancer:

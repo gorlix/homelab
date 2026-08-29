@@ -68,9 +68,12 @@ homelab/
 ├── renovate.json               # config Renovate (ADR-008)
 ├── docs/
 │   └── adr/                   # Architecture Decision Records
-├── opentofu/
-│   └── nodes/{dell-emc,hp-laptop,thinkcentre}/
-├── ansible/
+├── infrastructure/              # ansible/+opentofu/, tracciata direttamente come
+│   │                            # docker-compose/ (ADR-008) — stesso path usato
+│   │                            # per l'esecuzione reale su pve-management.
+│   ├── opentofu/
+│   │   └── nodes/{dell-emc,hp-laptop,thinkcentre}/
+│   └── ansible/
 ├── scripts/                    # gitleaks hook, timer auto-deploy (ADR-008)
 ├── .claude/skills/              # skill per scaffoldare nuovi servizi già sanitizzati
 ├── docker-compose/              # stessa cartella, stesso nome, dei nodi reali (es. /opt/docker-compose

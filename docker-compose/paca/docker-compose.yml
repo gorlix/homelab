@@ -10,8 +10,9 @@
 #     resta quindi al default ":80", Caddy non tenta mai un certificato suo.
 #   - immagini pinnate a 0.13.3 invece di ":latest" (deriva di versione non
 #     accettabile per un servizio con accesso a docker.sock, vedi sotto).
-#   - girato su una LXC dedicata (Paca-120, vedi opentofu/nodes/dell-emc/
-#     variables.tf), non su Docker-100: agent-runner monta /var/run/docker.sock
+#   - girato su una LXC dedicata (Paca-120, vedi
+#     infrastructure/opentofu/nodes/dell-emc/variables.tf), non su Docker-100:
+#     agent-runner monta /var/run/docker.sock
 #     dell'host per creare le sandbox dell'agente AI, un accesso equivalente a
 #     root sull'intero host — isolato per non condividere il blast radius con
 #     Nextcloud/Authentik/bot.
@@ -233,7 +234,7 @@ services:
   # Agent Runner — esegue le sandbox dell'agente AI. Richiede il socket
   # Docker dell'host (equivalente a root sull'host): per questo PACA gira su
   # una LXC dedicata (Paca-120) e non condivide host con altri servizi, vedi
-  # commento in testa al file e opentofu/nodes/dell-emc/variables.tf.
+  # commento in testa al file e infrastructure/opentofu/nodes/dell-emc/variables.tf.
   agent-runner:
     image: ${PACA_AGENT_RUNNER_IMAGE:-pacaai/paca-agent-runner:0.13.3}
     restart: unless-stopped
