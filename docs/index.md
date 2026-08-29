@@ -30,6 +30,7 @@ Ogni decisione non banale è un ADR nel formato *Contesto → Decisione → Alte
 | [ADR-006](adr/006-1password-connect.md) | Secret management con 1Password Connect | Accettato |
 | [ADR-007](adr/007-infisical-env-management.md) | Gestione delle variabili d'ambiente con Infisical | Accettato |
 | [ADR-008](adr/008-docker-compose-management.md) | Docker Compose, Renovate, deploy automatico | Accettato |
+| [ADR-009](adr/009-paca.md) | PACA su LXC dedicata (isolamento rischio `docker.sock`) | Accettato |
 
 **In programmazione:** ADR-003 (Authentik SSO), ADR-004 (backup 3-2-1 su S3 Cubbit).
 

@@ -91,7 +91,7 @@ Lo script **dispiega quello che è già stato deciso** su GitHub — non giudica
 ## Conseguenze
 
 > [!TIP] Positive
-> - `docker-compose/` è oggi l'unica fonte di verità per 8 servizi (1password-connect, infisical, linkwarden, monitoring, traefik, hawser, Semaphore, renovate), nessuna copia da tenere sincronizzata.
+> - `docker-compose/` è oggi l'unica fonte di verità per 9 servizi (1password-connect, infisical, linkwarden, monitoring, traefik, hawser, Semaphore, renovate, paca), nessuna copia da tenere sincronizzata.
 > - Renovate copre bonus anche `ansible-galaxy` e `terraform`, non solo le immagini Docker — scoperto scansionando il repository reale, non pianificato in anticipo.
 > - Commit di Renovate verificati ("Verified" su GitHub) senza gestire una chiave di firma per il bot.
 > - Deploy automatico end-to-end verificato dal vivo l'11/08/2026: un commit pushato è arrivato su `pve-management` da solo entro 5 minuti, senza intervento manuale — la prima volta che è successo per davvero, non solo in teoria.

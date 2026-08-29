@@ -40,6 +40,7 @@ Tutti e 3 su **Proxmox VE**.
 - Nextcloud (backup su S3 Cubbit)
 - Authentik (SSO centralizzato)
 - Monitoring infrastruttura
+- PACA (project management AI-native) — su LXC dedicata `Paca-120`, isolata da `Docker-100` per il rischio `docker.sock` di `agent-runner` (vedi ADR-009)
 - Nodi Kubernetes (work in progress)
 - Traefik (reverse proxy della Region B)
 - Cloudflare Tunnel (ad-hoc per la Region B)
@@ -51,7 +52,7 @@ Tutti e 3 su **Proxmox VE**.
 |---|---|---|
 | Provisioning | OpenTofu (`bpg/proxmox` provider) | Implementato per `dell-emc` (`Docker-100`, `Traefik-110`) — `hp-laptop`/`thinkcentre` non ancora |
 | Config management | Ansible | Implementato per `dell-emc` — stessa estensione mancante di sopra |
-| Servizi | Docker Compose, tracciato direttamente in `docker-compose/` (ADR-008) | Versionato e sanitizzato per gli 8 servizi di `dell-emc` — Region A (Home Assistant, AdGuard, Frigate) non ancora |
+| Servizi | Docker Compose, tracciato direttamente in `docker-compose/` (ADR-008) | Versionato e sanitizzato per i 9 servizi di `dell-emc` — Region A (Home Assistant, AdGuard, Frigate) non ancora |
 | Aggiornamenti automatici | Renovate self-hosted (minor/patch in automerge, major e immagini stateful dietro approvazione manuale) + timer systemd per il deploy | Implementato per `dell-emc` (ADR-008) |
 | Orchestrazione | Kubernetes + Flux CD | WIP, non ancora iniziato per davvero |
 | DNS HA | AdGuard Home + **Keepalived/VRRP** (failover IP) + **adguardhome-sync** (bakito/adguardhome-sync, sync config origin→replica) | Documentato in ADR-001 |
@@ -79,7 +80,7 @@ homelab/
 ├── docker-compose/              # stessa cartella, stesso nome, dei nodi reali (es. /opt/docker-compose
 │   │                            # su pve-management) — tracciata direttamente, non una copia separata
 │   │                            # (ADR-008). Servizi reali oggi: 1password-connect, infisical,
-│   │                            # linkwarden, monitoring, traefik, hawser, Semaphore, renovate.
+│   │                            # linkwarden, monitoring, traefik, hawser, Semaphore, renovate, paca.
 │   ├── traefik/
 │   ├── adguard/                # non ancora versionato (Region A)
 │   │   ├── keepalived/
@@ -102,6 +103,7 @@ homelab/
 - **ADR-006** — Secret management infrastrutturale con 1Password Connect
 - **ADR-007** — Gestione delle variabili d'ambiente applicative con Infisical
 - **ADR-008** — Versionamento docker-compose, aggiornamenti automatici (Renovate), deploy automatico
+- **ADR-009** — PACA su LXC dedicata (`Paca-120`), per isolare il rischio `docker.sock` di `agent-runner`
 
 ## ADR ancora da scrivere (menzionati nel README come placeholder)
 
