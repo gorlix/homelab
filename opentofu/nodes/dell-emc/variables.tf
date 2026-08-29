@@ -91,6 +91,21 @@ variable "containers" {
       services  = ["traefik"]
     }
 
+    # LXC dedicata (non su Docker-100): agent-runner monta /var/run/docker.sock
+    # dell'host per creare le sandbox dell'agente AI (e un sidecar docker:dind
+    # per conversazione) — chi ha quell'accesso controlla l'intero daemon
+    # Docker, non solo la propria rete. Isolata qui per non condividere il
+    # blast radius con Nextcloud/Authentik/bot su Docker-100.
+    "Paca-120" = {
+      vmid      = 120
+      ip        = "192.168.10.120/24"
+      gateway   = "192.168.10.254"
+      cores     = 4
+      memory    = 8192
+      disk_size = 60
+      services  = ["paca"]
+    }
+
     # Per aggiungere macchine future basterà inserire qui nuovi blocchi, ad esempio:
     # "rocky-target-101" = {
     #   vmid      = 101

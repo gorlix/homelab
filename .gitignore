@@ -16,6 +16,7 @@ docker-compose/**/data/
 docker-compose/**/pgdata/
 docker-compose/**/meili_data/
 docker-compose/**/volumes/
+docker-compose/**/backups/
 docker-compose/**/*.log
 # Semaphore: config/ contiene config.json generato al primo avvio con segreti
 # crittografici reali (cookie_hash, cookie_encryption, access_key_encryption),

@@ -11,3 +11,4 @@ infisical_migrated_services:
   - traefik
   - monitoring
   - linkwarden
+  - paca

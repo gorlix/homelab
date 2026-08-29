@@ -12,6 +12,12 @@ http:
         - web
       service: onepassword-connect
 
+    paca:
+      rule: "Host(`paca.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: paca
+
   services:
     # Infisical e 1Password Connect girano su pve-management (192.168.10.200), un
     # host diverso da quello di Traefik (192.168.10.110): niente docker provider/
@@ -25,3 +31,12 @@ http:
       loadBalancer:
         servers:
           - url: "http://192.168.10.200:8080"
+
+    # PACA gira sulla LXC dedicata Paca-120 (192.168.10.120), isolata da
+    # Docker-100 per il rischio docker.sock di agent-runner — vedi
+    # opentofu/nodes/dell-emc/variables.tf. Stesso motivo di backend statico
+    # cross-host di Infisical/1Password Connect sopra.
+    paca:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.120:80"

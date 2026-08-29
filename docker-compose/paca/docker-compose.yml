@@ -1,0 +1,282 @@
+# .env non presente in questa cartella: tutte le variabili (segrete e non)
+# sono migrate su Infisical (vedi ADR-007, cartella /paca) e vengono generate
+# al deploy dal ruolo Ansible infisical_secrets + docker_service, non
+# versionate qui — stesso schema di docker-compose/linkwarden/.
+#
+# Adattato da deploy/docker-compose.prod.yml di https://github.com/Paca-AI/paca
+# (release v0.13.3). Differenze rispetto all'upstream:
+#   - porta 443 del gateway rimossa: TLS lo termina Cloudflare Tunnel + Traefik
+#     in edge (docker-compose/traefik/), non Caddy (vedi ADR-002) — SITE_ADDRESS
+#     resta quindi al default ":80", Caddy non tenta mai un certificato suo.
+#   - immagini pinnate a 0.13.3 invece di ":latest" (deriva di versione non
+#     accettabile per un servizio con accesso a docker.sock, vedi sotto).
+#   - girato su una LXC dedicata (Paca-120, vedi opentofu/nodes/dell-emc/
+#     variables.tf), non su Docker-100: agent-runner monta /var/run/docker.sock
+#     dell'host per creare le sandbox dell'agente AI, un accesso equivalente a
+#     root sull'intero host — isolato per non condividere il blast radius con
+#     Nextcloud/Authentik/bot.
+#
+# Schema di migrazione DB: embedded nel binario dell'API, applicato
+# automaticamente ad ogni avvio (SQL idempotente).
+
+name: paca
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-paca}
+      POSTGRES_USER: ${POSTGRES_USER:-paca}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-paca} -d ${POSTGRES_DB:-paca}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Dump gzip di pg_dump su schedule cron (BACKUP_CRON), potatura oltre
+  # BACKUP_RETENTION_DAYS. Bind mount reale (unico in questo compose) — vedi
+  # .gitignore: docker-compose/**/backups/. Restore:
+  #   gunzip -c <file>.sql.gz | docker compose exec -T postgres psql -U ${POSTGRES_USER:-paca} -d ${POSTGRES_DB:-paca}
+  db-backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_USER:-paca}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-paca}?sslmode=disable}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+      BACKUP_CRON: ${BACKUP_CRON:-0 2 * * *}
+      TZ: ${TZ:-UTC}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        if [ "$$(echo "$$BACKUP_CRON" | wc -w)" -ne 5 ]; then
+          echo "Invalid BACKUP_CRON '$$BACKUP_CRON': expected 5 fields (minute hour day month weekday)" >&2
+          exit 1
+        fi
+        cat > /etc/backup.env <<EOF
+        DATABASE_URL="$$DATABASE_URL"
+        BACKUP_RETENTION_DAYS="$$BACKUP_RETENTION_DAYS"
+        EOF
+        cat > /usr/local/bin/run-backup.sh <<'EOS'
+        #!/bin/sh
+        set -e -o pipefail
+        . /etc/backup.env
+        ts="$$(date +%Y%m%d-%H%M%S)"
+        tmp="/backups/.paca-$${ts}.sql.gz.tmp"
+        out="/backups/paca-$${ts}.sql.gz"
+        if pg_dump "$$DATABASE_URL" --no-owner | gzip > "$$tmp"; then
+          mv "$$tmp" "$$out"
+          echo "Backup written: $$out"
+          find /backups -maxdepth 1 -name 'paca-*.sql.gz' -mtime "+$${BACKUP_RETENTION_DAYS}" -delete
+        else
+          echo "Backup failed at $${ts}" >&2
+          rm -f "$$tmp"
+        fi
+        EOS
+        chmod +x /usr/local/bin/run-backup.sh
+        mkdir -p /var/spool/cron/crontabs
+        echo "$$BACKUP_CRON /usr/local/bin/run-backup.sh >>/proc/1/fd/1 2>>/proc/1/fd/2" > /var/spool/cron/crontabs/root
+        echo "Database backup service started — schedule: $$BACKUP_CRON $$TZ (retention: $$BACKUP_RETENTION_DAYS days)."
+        exec crond -f -d 8
+    volumes:
+      - ${BACKUP_DIR:-./backups}:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    command: valkey-server --appendonly yes
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # S3-compatible object store, self-hosted. Per usare AWS S3 al posto di
+  # MinIO: STORAGE_PROVIDER=s3 su Infisical + `--scale minio=0` al deploy.
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_ACCESS_KEY:?STORAGE_SECRET_ACCESS_KEY is required}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # API (Go backend)
+  api:
+    image: ${PACA_API_IMAGE:-pacaai/paca-api:0.13.3}
+    restart: unless-stopped
+    environment:
+      ENV: ${ENVIRONMENT:-production}
+      PORT: 8080
+      DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_USER:-paca}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-paca}?sslmode=disable}
+      REDIS_URL: ${REDIS_URL:-redis://valkey:6379/0}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-168h}
+      JWT_REFRESH_SESSION_TTL: ${JWT_REFRESH_SESSION_TTL:-24h}
+      # true: siamo dietro TLS terminato da Cloudflare/Traefik, i cookie sono
+      # sempre serviti su https lato client.
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-minio}
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-minio:9000}
+      STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:-${PUBLIC_URL}/storage}
+      STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-paca}
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-minioadmin}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY}
+      STORAGE_USE_SSL: ${STORAGE_USE_SSL:-false}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      PUBLIC_URL: ${PUBLIC_URL:?PUBLIC_URL is required}
+      PLUGINS_WASM_DIR: /plugins
+      PLUGINS_FRONTEND_DIR: /plugins-frontend
+      PLUGINS_MCP_DIR: /plugins-mcp
+      PLUGINS_SKILLS_DIR: /plugins-skills
+      AGENT_API_KEY: ${AGENT_API_KEY}
+      AI_AGENT_URL: http://agent-runner:8080
+      AI_AGENT_INTERNAL_KEY: ${INTERNAL_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+      valkey:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+        required: false
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    volumes:
+      - backend_plugins:/plugins
+      - frontend_plugins:/plugins-frontend
+      - mcp_plugins:/plugins-mcp
+      - skills_plugins:/plugins-skills
+
+  # Web (React SPA servita da Caddy, immagine dedicata)
+  web:
+    image: ${PACA_WEB_IMAGE:-pacaai/paca-web:0.13.3}
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  # Realtime (Socket.IO)
+  realtime:
+    image: ${PACA_REALTIME_IMAGE:-pacaai/paca-realtime:0.13.3}
+    restart: unless-stopped
+    environment:
+      PORT: 3001
+      NODE_ENV: ${ENVIRONMENT:-production}
+      API_URL: http://api:8080
+      REDIS_URL: ${REDIS_URL:-redis://valkey:6379/0}
+      CORS_ORIGINS: ${CORS_ORIGINS:-${PUBLIC_URL}}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      valkey:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
+  # Gateway (Caddy) — unico entrypoint HTTP dello stack, instrada /api,/ws,
+  # /storage,/plugins* verso i servizi interni e serve la SPA (vedi
+  # ./caddy/Caddyfile). Pubblicato solo su :80: TLS termina a monte
+  # (Cloudflare Tunnel + Traefik), niente porta 443 qui — differenza
+  # deliberata rispetto all'upstream, vedi commento in testa al file.
+  gateway:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_PORT:-80}:80"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - frontend_plugins:/var/www/plugins:ro
+      - mcp_plugins:/var/www/plugins-mcp:ro
+      - skills_plugins:/var/www/plugins-skills:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_started
+      web:
+        condition: service_started
+      realtime:
+        condition: service_started
+
+  # Agent Runner — esegue le sandbox dell'agente AI. Richiede il socket
+  # Docker dell'host (equivalente a root sull'host): per questo PACA gira su
+  # una LXC dedicata (Paca-120) e non condivide host con altri servizi, vedi
+  # commento in testa al file e opentofu/nodes/dell-emc/variables.tf.
+  agent-runner:
+    image: ${PACA_AGENT_RUNNER_IMAGE:-pacaai/paca-agent-runner:0.13.3}
+    restart: unless-stopped
+    environment:
+      VALKEY_URL: ${REDIS_URL:-redis://valkey:6379/0}
+      DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_USER:-paca}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-paca}?sslmode=disable}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      PACA_API_URL: http://api:8080
+      PACA_GATEWAY_URL: http://gateway:8080
+      PACA_API_KEY: ${AGENT_API_KEY}
+      DOCKER_SOCKET: /var/run/docker.sock
+      AGENT_SERVER_IMAGE: ${AGENT_SERVER_IMAGE:-ghcr.io/paca-ai/paca-agent-server-goose:0.13.3}
+      PORT_POOL_START: ${PORT_POOL_START:-10000}
+      PORT_POOL_SIZE: ${PORT_POOL_SIZE:-100}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-10}
+      CHAT_SANDBOX_IDLE_TIMEOUT_MINUTES: ${CHAT_SANDBOX_IDLE_TIMEOUT_MINUTES:-3}
+      AGENT_RUNNER_ALLOWED_AGENT_IDS: ${AGENT_RUNNER_ALLOWED_AGENT_IDS:-*}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      # SSH/port-forward verso le sandbox: off di default (range vuoto), non
+      # attivato in questo deploy iniziale.
+      SSH_BASTION_PORT_RANGE_START: ${SSH_BASTION_PORT_RANGE_START:-}
+      SSH_BASTION_PORT_RANGE_END: ${SSH_BASTION_PORT_RANGE_END:-}
+      PORT_FORWARD_RANGE_START: ${PORT_FORWARD_RANGE_START:-}
+      PORT_FORWARD_RANGE_END: ${PORT_FORWARD_RANGE_END:-}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+      valkey:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  valkey_data:
+  minio_data:
+  backend_plugins:
+  frontend_plugins:
+  mcp_plugins:
+  skills_plugins:
+  caddy_data:
+  caddy_config:
