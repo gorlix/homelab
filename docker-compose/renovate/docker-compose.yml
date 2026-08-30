@@ -7,7 +7,7 @@
 # aspetta RENOVATE_INTERVAL_SECONDS (default 1h), ripete.
 services:
   renovate:
-    image: renovate/renovate:44.24.2
+    image: renovate/renovate:44.48.1
     container_name: renovate
     restart: unless-stopped
     env_file: .env
