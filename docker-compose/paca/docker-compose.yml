@@ -4,11 +4,11 @@
 # versionate qui — stesso schema di docker-compose/linkwarden/.
 #
 # Adattato da deploy/docker-compose.prod.yml di https://github.com/Paca-AI/paca
-# (release v0.13.3). Differenze rispetto all'upstream:
+# (release v0.14.1). Differenze rispetto all'upstream:
 #   - porta 443 del gateway rimossa: TLS lo termina Cloudflare Tunnel + Traefik
 #     in edge (docker-compose/traefik/), non Caddy (vedi ADR-002) — SITE_ADDRESS
 #     resta quindi al default ":80", Caddy non tenta mai un certificato suo.
-#   - immagini pinnate a 0.13.3 invece di ":latest" (deriva di versione non
+#   - immagini pinnate a 0.14.1 invece di ":latest" (deriva di versione non
 #     accettabile per un servizio con accesso a docker.sock, vedi sotto).
 #   - girato su una LXC dedicata (Paca-120, vedi
 #     infrastructure/opentofu/nodes/dell-emc/variables.tf), non su Docker-100:
@@ -16,6 +16,13 @@
 #     dell'host per creare le sandbox dell'agente AI, un accesso equivalente a
 #     root sull'intero host — isolato per non condividere il blast radius con
 #     Nextcloud/Authentik/bot.
+#
+# Bump v0.13.3 -> v0.14.1 (01/09/2026): solo aggiunte, verificato sul diff
+# upstream (deploy/docker-compose.prod.yml, deploy/caddy/Caddyfile) prima di
+# bumpare — nuove variabili opzionali SSH_BASTION_*/PORT_FORWARD_* per
+# accesso SSH/port-forward alle sandbox degli ambienti statici, off di
+# default, non aggiunte qui perché non usate. Nessuna variabile esistente
+# rinominata o rimossa.
 #
 # Schema di migrazione DB: embedded nel binario dell'API, applicato
 # automaticamente ad ogni avvio (SQL idempotente).
@@ -126,7 +133,7 @@ services:
 
   # API (Go backend)
   api:
-    image: ${PACA_API_IMAGE:-pacaai/paca-api:0.13.3}
+    image: ${PACA_API_IMAGE:-pacaai/paca-api:0.14.1}
     restart: unless-stopped
     environment:
       ENV: ${ENVIRONMENT:-production}
@@ -182,14 +189,14 @@ services:
 
   # Web (React SPA servita da Caddy, immagine dedicata)
   web:
-    image: ${PACA_WEB_IMAGE:-pacaai/paca-web:0.13.3}
+    image: ${PACA_WEB_IMAGE:-pacaai/paca-web:0.14.1}
     restart: unless-stopped
     depends_on:
       - api
 
   # Realtime (Socket.IO)
   realtime:
-    image: ${PACA_REALTIME_IMAGE:-pacaai/paca-realtime:0.13.3}
+    image: ${PACA_REALTIME_IMAGE:-pacaai/paca-realtime:0.14.1}
     restart: unless-stopped
     environment:
       PORT: 3001
@@ -236,7 +243,7 @@ services:
   # una LXC dedicata (Paca-120) e non condivide host con altri servizi, vedi
   # commento in testa al file e infrastructure/opentofu/nodes/dell-emc/variables.tf.
   agent-runner:
-    image: ${PACA_AGENT_RUNNER_IMAGE:-pacaai/paca-agent-runner:0.13.3}
+    image: ${PACA_AGENT_RUNNER_IMAGE:-pacaai/paca-agent-runner:0.14.1}
     restart: unless-stopped
     environment:
       VALKEY_URL: ${REDIS_URL:-redis://valkey:6379/0}
@@ -246,7 +253,7 @@ services:
       PACA_GATEWAY_URL: http://gateway:8080
       PACA_API_KEY: ${AGENT_API_KEY}
       DOCKER_SOCKET: /var/run/docker.sock
-      AGENT_SERVER_IMAGE: ${AGENT_SERVER_IMAGE:-ghcr.io/paca-ai/paca-agent-server-goose:0.13.3}
+      AGENT_SERVER_IMAGE: ${AGENT_SERVER_IMAGE:-ghcr.io/paca-ai/paca-agent-server-goose:0.14.1}
       PORT_POOL_START: ${PORT_POOL_START:-10000}
       PORT_POOL_SIZE: ${PORT_POOL_SIZE:-100}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-10}
