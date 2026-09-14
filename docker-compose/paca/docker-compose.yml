@@ -116,8 +116,13 @@ services:
 
   # S3-compatible object store, self-hosted. Per usare AWS S3 al posto di
   # MinIO: STORAGE_PROVIDER=s3 su Infisical + `--scale minio=0` al deploy.
+  # Immagine da quay.io, non Docker Hub: MinIO ha smesso di pubblicare le
+  # build OSS di minio/minio su Docker Hub (pull anonimo fallisce con
+  # "repository does not exist or may require 'docker login'" — scoperto sul
+  # redeploy reale di Paca-120 del 14/09/2026, non dalla documentazione),
+  # quay.io/minio/minio resta la distribuzione libera ufficiale.
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
