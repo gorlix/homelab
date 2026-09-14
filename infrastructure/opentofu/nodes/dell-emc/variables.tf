@@ -106,6 +106,25 @@ variable "containers" {
       services  = ["paca"]
     }
 
+    # LXC dedicata (non su Docker-100/Paca-120): ospiterà un runner GitHub
+    # Actions self-hosted per il deploy di staging di project_minder — un
+    # runner con accesso Docker (build/gestione container) è equivalente a
+    # root sull'host che lo ospita, stessa classe di rischio già isolata per
+    # Paca-120/agent-runner. services vuoto: la registrazione del runner e il
+    # docker-compose.yml di minder-server/Caddy arrivano dopo a mano
+    # (nessun compose ancora versionato in docker-compose/minder-server/) —
+    # aggiungere "minder-server" qui solo una volta che quella cartella esiste,
+    # altrimenti il ruolo Ansible docker_service fallisce al copy.
+    "Minder-130" = {
+      vmid      = 130
+      ip        = "192.168.10.130/24"
+      gateway   = "192.168.10.254"
+      cores     = 1
+      memory    = 2048
+      disk_size = 10
+      services  = []
+    }
+
     # Per aggiungere macchine future basterà inserire qui nuovi blocchi, ad esempio:
     # "rocky-target-101" = {
     #   vmid      = 101

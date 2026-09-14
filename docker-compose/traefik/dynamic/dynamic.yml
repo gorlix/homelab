@@ -18,6 +18,17 @@ http:
         - web
       service: paca
 
+    # minder-server (project_minder, staging) gira sulla LXC dedicata
+    # Minder-130 (192.168.10.130) — vedi infrastructure/opentofu/nodes/dell-emc/variables.tf.
+    # Backend non ancora up al momento di questa modifica (compose non ancora
+    # versionato): la route è pre-cablata, restituirà 502 finché il gateway
+    # Caddy dello stack minder-server non è deployato e in ascolto su :80.
+    minder-server:
+      rule: "Host(`api-minder.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: minder-server
+
   services:
     # Infisical e 1Password Connect girano su pve-management (192.168.10.200), un
     # host diverso da quello di Traefik (192.168.10.110): niente docker provider/
@@ -40,3 +51,8 @@ http:
       loadBalancer:
         servers:
           - url: "http://192.168.10.120:80"
+
+    minder-server:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.130:80"
