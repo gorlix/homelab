@@ -63,6 +63,19 @@ resource "proxmox_virtual_environment_container" "rocky_targets" {
     bridge = "vmbr0"
   }
 
+  # Bind mount opzionale verso una directory sul nodo Proxmox stesso (`pve`),
+  # non sul disco della LXC: sopravvive a un destroy+recreate del container
+  # (vedi commento su backup_host_path in variables.tf). Zero blocchi quando
+  # backup_host_path è null, quindi nessun impatto sui container che non lo
+  # usano.
+  dynamic "mount_point" {
+    for_each = each.value.backup_host_path != null ? [each.value.backup_host_path] : []
+    content {
+      volume = mount_point.value
+      path   = "/mnt/persistent-backups"
+    }
+  }
+
   # AUTO-SETUP SSH: Installa openssh-server, genera le chiavi host ed avvia il servizio
   provisioner "local-exec" {
     command = "ssh -o StrictHostKeyChecking=no root@192.168.10.199 'pct exec ${each.value.vmid} -- bash -c \"dnf install -y openssh-server && ssh-keygen -A && systemctl enable --now sshd\"'"

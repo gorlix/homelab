@@ -46,8 +46,13 @@ services:
       retries: 10
 
   # Dump gzip di pg_dump su schedule cron (BACKUP_CRON), potatura oltre
-  # BACKUP_RETENTION_DAYS. Bind mount reale (unico in questo compose) — vedi
-  # .gitignore: docker-compose/**/backups/. Restore:
+  # BACKUP_RETENTION_DAYS. BACKUP_DIR punta a /mnt/persistent-backups, un bind
+  # mount della LXC verso una directory sul nodo Proxmox stesso (`pve`), non
+  # sul disco della LXC — vedi backup_host_path in
+  # infrastructure/opentofu/nodes/dell-emc/variables.tf. Prima di questo fix
+  # (14/09/2026) puntava a ./backups, sullo stesso disco della LXC: quando la
+  # LXC è stata ricreata durante una rotazione di chiavi SSH, backup e dati
+  # sono spariti insieme. Restore:
   #   gunzip -c <file>.sql.gz | docker compose exec -T postgres psql -U ${POSTGRES_USER:-paca} -d ${POSTGRES_DB:-paca}
   db-backup:
     image: postgres:16-alpine
@@ -91,7 +96,7 @@ services:
         echo "Database backup service started — schedule: $$BACKUP_CRON $$TZ (retention: $$BACKUP_RETENTION_DAYS days)."
         exec crond -f -d 8
     volumes:
-      - ${BACKUP_DIR:-./backups}:/backups
+      - ${BACKUP_DIR:-/mnt/persistent-backups}:/backups
     depends_on:
       postgres:
         condition: service_healthy

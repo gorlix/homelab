@@ -68,6 +68,13 @@ variable "containers" {
     # site.yml, letto per-host da inventory.yml — non più una lista unica valida
     # per tutto il gruppo docker_nodes, dato che ora i nodi fanno cose diverse).
     services = list(string)
+    # Path opzionale su `pve` (il nodo Proxmox, non la LXC) da montare come bind
+    # mount dentro il container. Vive fuori dal disco della LXC: sopravvive a un
+    # destroy+recreate del container (es. la sostituzione forzata quando cambia
+    # initialization.user_account.keys — vedi incidente 14/09/2026, dati PACA in
+    # produzione persi perché il backup locale era sullo stesso disco della LXC
+    # ricreata). null per i container che non ne hanno bisogno.
+    backup_host_path = optional(string, null)
   }))
   description = "Mappa dei container LXC da creare su Proxmox"
   default = {
@@ -97,13 +104,14 @@ variable "containers" {
     # Docker, non solo la propria rete. Isolata qui per non condividere il
     # blast radius con Nextcloud/Authentik/bot su Docker-100.
     "Paca-120" = {
-      vmid      = 120
-      ip        = "192.168.10.120/24"
-      gateway   = "192.168.10.254"
-      cores     = 4
-      memory    = 8192
-      disk_size = 60
-      services  = ["paca"]
+      vmid              = 120
+      ip                = "192.168.10.120/24"
+      gateway           = "192.168.10.254"
+      cores             = 4
+      memory            = 8192
+      disk_size         = 60
+      services          = ["paca"]
+      backup_host_path  = "/var/lib/pve-persistent/paca-backups"
     }
 
     # LXC dedicata (non su Docker-100/Paca-120): ospiterà un runner GitHub
