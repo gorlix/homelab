@@ -63,22 +63,28 @@ resource "proxmox_virtual_environment_container" "rocky_targets" {
     bridge = "vmbr0"
   }
 
-  # Bind mount opzionale verso una directory sul nodo Proxmox stesso (`pve`),
-  # non sul disco della LXC: sopravvive a un destroy+recreate del container
-  # (vedi commento su backup_host_path in variables.tf). Zero blocchi quando
-  # backup_host_path è null, quindi nessun impatto sui container che non lo
-  # usano.
-  dynamic "mount_point" {
-    for_each = each.value.backup_host_path != null ? [each.value.backup_host_path] : []
-    content {
-      volume = mount_point.value
-      path   = "/mnt/persistent-backups"
-    }
-  }
-
   # AUTO-SETUP SSH: Installa openssh-server, genera le chiavi host ed avvia il servizio
   provisioner "local-exec" {
     command = "ssh -o StrictHostKeyChecking=no root@192.168.10.199 'pct exec ${each.value.vmid} -- bash -c \"dnf install -y openssh-server && ssh-keygen -A && systemctl enable --now sshd\"'"
+  }
+
+  # Bind mount opzionale verso una directory sul nodo Proxmox stesso (`pve`),
+  # non sul disco della LXC: sopravvive a un destroy+recreate del container
+  # (vedi backup_host_path in variables.tf). NON un blocco nativo mount_point:
+  # tentato in un primo momento, ma l'API Proxmox rifiuta i mount point di
+  # tipo bind per QUALUNQUE token API, anche root@pve!tofu-token — "mount
+  # point type bind is only allowed for root@pam", una restrizione hardcoded
+  # di Proxmox indipendente dai privilegi del token (scoperto il 16/09/2026
+  # con un create fallito su Paca-120, container temporaneamente sparita).
+  # `pct set` via SSH diretto come root reale bypassa la restrizione, stesso
+  # meccanismo già usato sopra per il bootstrap SSH. Idempotente: riscrive la
+  # riga mp0 ad ogni apply, non serve un controllo "già presente".
+  provisioner "local-exec" {
+    command = <<-EOT
+      %{if each.value.backup_host_path != null~}
+      ssh -o StrictHostKeyChecking=no root@192.168.10.199 'pct set ${each.value.vmid} -mp0 ${each.value.backup_host_path},mp=/mnt/persistent-backups'
+      %{endif~}
+    EOT
   }
 }
 
