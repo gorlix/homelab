@@ -253,7 +253,7 @@ services:
   # una LXC dedicata (Paca-120) e non condivide host con altri servizi, vedi
   # commento in testa al file e infrastructure/opentofu/nodes/dell-emc/variables.tf.
   agent-runner:
-    image: ${PACA_AGENT_RUNNER_IMAGE:-pacaai/paca-agent-runner:0.14.1}
+    image: ${PACA_AGENT_RUNNER_IMAGE:-pacaai/paca-agent-runner:0.16.3}
     restart: unless-stopped
     environment:
       VALKEY_URL: ${REDIS_URL:-redis://valkey:6379/0}
