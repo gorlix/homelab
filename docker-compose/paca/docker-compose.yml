@@ -143,7 +143,7 @@ services:
 
   # API (Go backend)
   api:
-    image: ${PACA_API_IMAGE:-pacaai/paca-api:0.14.1}
+    image: ${PACA_API_IMAGE:-pacaai/paca-api:0.16.3}
     restart: unless-stopped
     environment:
       ENV: ${ENVIRONMENT:-production}
