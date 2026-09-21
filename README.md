@@ -131,7 +131,7 @@ flowchart TB
 Ogni sito ha il proprio Cloudflare Tunnel e il proprio Traefik, così i due domini di guasto restano separati: un problema in un sito non tocca l'esposizione dell'altro.
 
 - **Region A — Casa:** `hp-laptop` + `thinkcentre` sono un **cluster Proxmox** sulla stessa LAN. Il tunnel Cloudflare di casa fronta Home Assistant e gli altri servizi locali via Traefik su `hp-laptop`. Nessuna porta esposta sul router di casa.
-- **Region B — Ditta:** `dell-emc` è un nodo **Proxmox standalone** ospitato presso l'azienda di famiglia, su una **VLAN dedicata dietro un firewall Cisco gestito e supervisionato da terzi**. Ha un Cloudflare Tunnel ad-hoc e un Traefik proprio per i servizi di produzione (Authentik, Nextcloud, bot, monitoring, PACA — quest'ultimo su una LXC dedicata, vedi [ADR-009](docs/adr/009-paca.md)).
+- **Region B — Ditta:** `dell-emc` è un nodo **Proxmox standalone** ospitato presso l'azienda di famiglia, su una **VLAN dedicata dietro un firewall Cisco gestito e supervisionato da terzi**. Ha un Cloudflare Tunnel ad-hoc e un Traefik proprio per i servizi di produzione (Authentik, Nextcloud, bot, monitoring, PACA — quest'ultimo su una LXC dedicata, vedi [ADR-009](docs/adr/009-paca.md)) e per lo staging di `project_minder` su un'altra LXC dedicata ([ADR-011](docs/adr/011-minder-130-runner-staging.md)).
 
 ### Interconnessione tra i siti
 
@@ -229,6 +229,8 @@ Ogni scelta non banale è documentata nel formato *Contesto → Decisione → Co
 - [ADR-007](docs/adr/007-infisical-env-management.md) — Gestione delle variabili d'ambiente con Infisical
 - [ADR-008](docs/adr/008-docker-compose-management.md) — Versionamento docker-compose, aggiornamenti automatici (Renovate), deploy automatico
 - [ADR-009](docs/adr/009-paca.md) — PACA su LXC dedicata, per isolare il rischio `docker.sock` di `agent-runner`
+- [ADR-010](docs/adr/010-persistenza-dati-fuori-dalla-lxc.md) — Persistenza dei dati fuori dalla LXC, dopo la perdita dei dati di produzione di PACA (post-mortem incluso)
+- [ADR-011](docs/adr/011-minder-130-runner-staging.md) — `Minder-130`: LXC dedicata per il runner di staging di project_minder, esposta via Cloudflare Tunnel invece che con porte in ingresso
 
 Decisioni già prese ma non ancora scritte per esteso (in programmazione):
 
@@ -243,8 +245,10 @@ Protezione aggiuntiva: **gitleaks** come pre-commit hook (repo locale e checkout
 
 ## Roadmap
 
-- [x] Documentazione architetturale e ADR (000, 001, 002, 005, 006, 007, 008 — 003/004 in programmazione)
-- [x] OpenTofu + Ansible per provisioning e setup base dei container LXC su `dell-emc` (`Docker-100`, `Traefik-110` — `hp-laptop`/`thinkcentre` ancora da fare)
+- [x] Documentazione architetturale e ADR (000, 001, 002, 005, 006, 007, 008, 009, 010, 011 — 003/004 in programmazione)
+- [x] OpenTofu + Ansible per provisioning e setup base dei container LXC su `dell-emc` (`Docker-100`, `Traefik-110`, `Paca-120`, `Minder-130` — `hp-laptop`/`thinkcentre` ancora da fare)
+- [ ] Seconda copia dei backup di PACA fuori dal nodo `pve` (oggi solo una directory locale, vedi [ADR-010](docs/adr/010-persistenza-dati-fuori-dalla-lxc.md)), con `fstrim` periodico e alert sul thin pool
+- [ ] Rotazione delle chiavi SSH dei container senza ricreare le LXC (chiavi scollegate da `initialization.user_account.keys`)
 - [x] Migrazione secret management su 1Password Connect + Infisical, in produzione
 - [x] Docker Compose versionato e sanitizzato per i servizi di `dell-emc`, aggiornamenti automatici con Renovate, deploy automatico via timer systemd ([ADR-008](docs/adr/008-docker-compose-management.md)) — Region A ancora da versionare
 - [ ] CI reale su GitHub Actions (gitleaks già attivo solo come pre-commit hook locale)

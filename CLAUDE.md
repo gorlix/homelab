@@ -41,6 +41,7 @@ Tutti e 3 su **Proxmox VE**.
 - Authentik (SSO centralizzato)
 - Monitoring infrastruttura
 - PACA (project management AI-native) — su LXC dedicata `Paca-120`, isolata da `Docker-100` per il rischio `docker.sock` di `agent-runner` (vedi ADR-009)
+- Runner GitHub Actions self-hosted + staging di `project_minder` — su LXC dedicata `Minder-130`, stesso schema di isolamento di `Paca-120`; unità creata ma runner e stack non ancora installati (vedi ADR-011)
 - Nodi Kubernetes (work in progress)
 - Traefik (reverse proxy della Region B)
 - Cloudflare Tunnel (ad-hoc per la Region B)
@@ -104,6 +105,8 @@ homelab/
 - **ADR-007** — Gestione delle variabili d'ambiente applicative con Infisical
 - **ADR-008** — Versionamento docker-compose, aggiornamenti automatici (Renovate), deploy automatico
 - **ADR-009** — PACA su LXC dedicata (`Paca-120`), per isolare il rischio `docker.sock` di `agent-runner`
+- **ADR-010** — Persistenza dei dati fuori dalla LXC, dopo la perdita dei dati di produzione di PACA (14-17/09/2026): leggere prima di toccare `variables.tf`/`main.tf` di una LXC con dati
+- **ADR-011** — `Minder-130`, LXC dedicata per il runner di staging di project_minder, esposta via Cloudflare Tunnel
 
 ## ADR ancora da scrivere (menzionati nel README come placeholder)
 
@@ -119,6 +122,8 @@ homelab/
 **Regola d'oro per ogni file pubblicato (config, non solo doc):** prima di ogni commit, l'autore deve poter spiegare il file riga per riga senza guardarlo. Claude Code non deve generare configurazioni che l'utente non ha revisionato e compreso — se propone una configurazione complessa, deve accompagnarla con una spiegazione chiara del *perché*, non solo del *cosa*.
 
 **Segreti:** nessun valore in chiaro nel repo. Solo riferimenti `op://vault/item/field` risolti a runtime con 1Password CLI/Connect, o segreti applicativi su Infisical (ADR-007). Gitleaks come pre-commit hook (repo locale e checkout su `pve-management`) è rete di sicurezza aggiuntiva, non la difesa primaria — CI su GitHub ancora da impostare. Attenzione anche a segreti "impliciti": IP pubblici, MAC address, coordinate GPS in config Home Assistant, serial number nei log — vanno sanitizzati a mano. Anche identificativi non tecnicamente segreti ma specifici di una risorsa reale (es. un id di vault) vanno evitati come default hardcoded in script versionati — vedi ADR-006.
+
+**Modifiche a OpenTofu che toccano una LXC con dati (ADR-010):** con il provider `bpg/proxmox`, cambiare `initialization.user_account.keys` o aggiungere un blocco `mount_point` marca `# forces replacement`: la LXC viene distrutta e ricreata con disco nuovo, non aggiornata sul posto. Prima di ogni `apply`: `plan`, cercare `forces replacement` per ogni container, e se c'è, un dump verificato copiato fuori dalla LXC. Non dichiarare mai "in-place" senza averlo visto nel plan. Se un `apply` con provisioner Ansible fallisce, Tofu stampa le chiavi private SSH di tutti i container: chiedere all'utente solo le ultime righe dell'output (PLAY RECAP / task fallito) e rieseguire il deploy con `infrastructure/ansible/run.sh`, non con un nuovo `tofu apply`.
 
 **Niente emoji nella documentazione.** README, ADR, note del vault e diagrammi non usano emoji decorative (né nei titoli né nelle tabelle di stato): testo semplice, più professionale e stabile per anchor e rendering. Le frecce tipografiche (`→`, `↔`) e i simboli tecnici non sono emoji e restano ammessi.
 
