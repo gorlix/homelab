@@ -199,7 +199,7 @@ services:
 
   # Web (React SPA servita da Caddy, immagine dedicata)
   web:
-    image: ${PACA_WEB_IMAGE:-pacaai/paca-web:0.14.1}
+    image: ${PACA_WEB_IMAGE:-pacaai/paca-web:0.16.3}
     restart: unless-stopped
     depends_on:
       - api
