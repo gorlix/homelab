@@ -79,10 +79,29 @@ resource "proxmox_virtual_environment_container" "rocky_targets" {
   # `pct set` via SSH diretto come root reale bypassa la restrizione, stesso
   # meccanismo già usato sopra per il bootstrap SSH. Idempotente: riscrive la
   # riga mp0 ad ogni apply, non serve un controllo "già presente".
+  #
+  # Tre dettagli non ovvi, tutti necessari:
+  # - chown 100000:100000: la LXC è unprivileged, il suo root è uid 100000
+  #   sull'host; senza questo la directory (root:root) non sarebbe scrivibile
+  #   dal container e db-backup fallirebbe con "permission denied".
+  # - pct reboot: un mp aggiunto a un container già avviato si attiva solo al
+  #   riavvio. Senza, Ansible farebbe partire db-backup PRIMA che il mount
+  #   esista e Docker creerebbe /mnt/persistent-backups sul disco della LXC,
+  #   in silenzio: backup di nuovo effimeri, il problema che questo blocco
+  #   deve evitare.
+  # - il ciclo di attesa: Ansible parte subito dopo questo provisioner e
+  #   ha bisogno di sshd già di nuovo raggiungibile.
   provisioner "local-exec" {
     command = <<-EOT
       %{if each.value.backup_host_path != null~}
-      ssh -o StrictHostKeyChecking=no root@192.168.10.199 'pct set ${each.value.vmid} -mp0 ${each.value.backup_host_path},mp=/mnt/persistent-backups'
+      set -e
+      ssh -o StrictHostKeyChecking=no root@192.168.10.199 'chown 100000:100000 ${each.value.backup_host_path} && pct set ${each.value.vmid} -mp0 ${each.value.backup_host_path},mp=/mnt/persistent-backups && pct reboot ${each.value.vmid}'
+      for i in $(seq 1 40); do
+        if ssh -o StrictHostKeyChecking=no root@192.168.10.199 'pct exec ${each.value.vmid} -- systemctl is-active sshd' >/dev/null 2>&1; then
+          break
+        fi
+        sleep 3
+      done
       %{endif~}
     EOT
   }
