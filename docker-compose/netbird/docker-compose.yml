@@ -1,0 +1,37 @@
+# Client Netbird (netbird.io) su Netbird Cloud (SaaS), in affiancamento a
+# Tailscale — test, non sostituzione. Non è il management/signal server
+# self-hosted: qui gira solo il peer che si registra sulla rete Netbird Cloud
+# tramite setup key.
+#
+# cap_add + devices/dev/net/tun + network_mode host sono la configurazione
+# ufficiale documentata da netbird.io per il client in Docker (verificato
+# sulla doc ufficiale, non assunto): il client crea un'interfaccia WireGuard e
+# usa eBPF/raw socket, per cui NET_ADMIN da solo non basta. network_mode host
+# è accettabile qui perché questa LXC (Netbird-101) è dedicata solo a questo
+# servizio — non condivide la rete con altri container.
+#
+# SYS_ADMIN/SYS_RESOURCE dentro una LXC unprivileged sono un punto da
+# verificare al primo avvio: se il container non parte per un permission
+# error legato a queste capability, il prossimo passo è abilitare la feature
+# `keyctl` sulla LXC (non ancora provata, vedi variables.tf) prima di
+# considerare una LXC privileged.
+services:
+  netbird:
+    image: netbirdio/netbird:0.79.0
+    container_name: netbird
+    hostname: netbird-dell-emc
+    restart: unless-stopped
+    env_file: .env
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_RESOURCE
+    devices:
+      - /dev/net/tun
+    network_mode: host
+    volumes:
+      - netbird-client:/var/lib/netbird
+
+volumes:
+  netbird-client:
+    name: netbird-client

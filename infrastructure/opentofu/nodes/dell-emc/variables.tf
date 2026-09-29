@@ -75,6 +75,11 @@ variable "containers" {
     # produzione persi perché il backup locale era sullo stesso disco della LXC
     # ricreata). null per i container che non ne hanno bisogno.
     backup_host_path = optional(string, null)
+    # true per i container che devono creare un'interfaccia WireGuard (es. client
+    # Netbird): serve passthrough di /dev/net/tun, che un container LXC unprivileged
+    # con solo `features.nesting` non ha di default. Gestito con un local-exec
+    # dedicato in main.tf (stesso schema del blocco backup_host_path sopra).
+    tun_device = optional(bool, false)
   }))
   description = "Mappa dei container LXC da creare su Proxmox"
   default = {
@@ -131,6 +136,25 @@ variable "containers" {
       memory    = 2048
       disk_size = 10
       services  = []
+    }
+
+    # LXC dedicata per il client Netbird (netbird.io), mesh VPN WireGuard-based
+    # in affiancamento a Tailscale — test, non sostituzione. Backend Netbird Cloud
+    # (SaaS), non self-hosted. Isolata in una LXC propria come Paca-120/Minder-130
+    # invece che dentro Traefik-110: nessuna relazione con Traefik/cloudflared.
+    # tun_device = true perché il client deve creare un'interfaccia WireGuard
+    # (richiede /dev/net/tun + NET_ADMIN, non garantiti di default in un container
+    # unprivileged con solo nesting). vmid 101: primo libero, i vmid esistenti
+    # (100/110/120/130) lasciano 101-109 liberi.
+    "Netbird-101" = {
+      vmid       = 101
+      ip         = "192.168.10.101/24"
+      gateway    = "192.168.10.254"
+      cores      = 1
+      memory     = 512
+      disk_size  = 8
+      services   = ["netbird"]
+      tun_device = true
     }
 
     # Per aggiungere macchine future basterà inserire qui nuovi blocchi, ad esempio:

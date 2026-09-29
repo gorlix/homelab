@@ -105,6 +105,37 @@ resource "proxmox_virtual_environment_container" "rocky_targets" {
       %{endif~}
     EOT
   }
+
+  # Passthrough di /dev/net/tun per i container che devono creare interfacce
+  # WireGuard (vedi tun_device in variables.tf, es. il client Netbird). Un
+  # container unprivileged con solo `features.nesting = true` non ha questo
+  # device di default: serve abilitarlo esplicitamente nel file di config LXC
+  # sull'host Proxmox, non c'è un attributo dedicato nel provider bpg/proxmox
+  # per farlo dichiarativamente. Stesso approccio già in uso sopra per il bind
+  # mount di backup_host_path: `pct set`/edit diretto via SSH come root reale
+  # sull'host, perché l'API Proxmox è più restrittiva del CLI su alcune
+  # operazioni. grep -qxF prima di appendere: idempotente, non duplica le righe
+  # a ogni apply. pct reboot: il device passthrough si attiva solo al riavvio,
+  # stesso motivo del reboot già usato per mp0 sopra.
+  provisioner "local-exec" {
+    command = <<-EOT
+      %{if each.value.tun_device~}
+      set -e
+      ssh -o StrictHostKeyChecking=no root@192.168.10.199 '
+        CONF=/etc/pve/lxc/${each.value.vmid}.conf
+        grep -qxF "lxc.cgroup2.devices.allow: c 10:200 rwm" "$CONF" || echo "lxc.cgroup2.devices.allow: c 10:200 rwm" >> "$CONF"
+        grep -qxF "lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file" "$CONF" || echo "lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file" >> "$CONF"
+        pct reboot ${each.value.vmid}
+      '
+      for i in $(seq 1 40); do
+        if ssh -o StrictHostKeyChecking=no root@192.168.10.199 'pct exec ${each.value.vmid} -- systemctl is-active sshd' >/dev/null 2>&1; then
+          break
+        fi
+        sleep 3
+      done
+      %{endif~}
+    EOT
+  }
 }
 
 # Generazione dell'inventory.yml per Ansible. op_item_title è il titolo con cui il
