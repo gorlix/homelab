@@ -3,8 +3,18 @@ terraform {
 
   required_providers {
     proxmox = {
-      source  = "bpg/proxmox"
-      version = "~> 0.114.0"
+      source = "bpg/proxmox"
+      # Pinnato a 0.113.x (non "~> 0.114.0" come mergiato da Renovate in #24):
+      # 0.114.0 introduce una lettura del mount_point mp0 di Paca-120 (creato
+      # out-of-band via `pct set` per il bind mount dei backup, mai dichiarato
+      # come risorsa Terraform — vedi backup_host_path in variables.tf) che il
+      # refresh ora vede come drift da rimuovere, con `forces replacement` sul
+      # container — cioè destroy+recreate della stessa LXC dell'incidente di
+      # perdita dati del 14-17/09/2026 (ADR-010). Verificato dal vivo con
+      # `tofu plan` il 29/09/2026, non assunto dal changelog. Restare su
+      # 0.113.x finché non si capisce la causa esatta e si decide una
+      # soluzione (vedi commento vicino a backup_host_path in variables.tf).
+      version = "~> 0.113.1"
     }
     onepassword = {
       source  = "1password/onepassword"

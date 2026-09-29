@@ -24,6 +24,13 @@
       "matchPackageNames": ["postgres", "getmeili/meilisearch", "redis", "influxdb"],
       "matchUpdateTypes": ["major"],
       "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Provider bpg/proxmox: niente automerge nemmeno per minor. Il bump 0.113.1 -> 0.114.0 (mergiato automaticamente il 29/09/2026, PR #24) cambia come il provider legge il mount_point mp0 di Paca-120 (creato out-of-band via `pct set`, mai dichiarato come risorsa Terraform — vedi backup_host_path in infrastructure/opentofu/nodes/dell-emc/variables.tf): al refresh lo vede come drift e propone `forces replacement` sulla stessa LXC dell'incidente di perdita dati del 14-17/09/2026 (ADR-010). Un bump 'minor' su questo provider può quindi avere un impatto stateful reale — richiede revisione manuale del plan prima del merge, non solo automerge silenzioso.",
+      "matchDatasources": ["terraform-provider"],
+      "matchPackageNames": ["bpg/proxmox"],
+      "automerge": false,
+      "dependencyDashboardApproval": true
     }
   ]
 }
