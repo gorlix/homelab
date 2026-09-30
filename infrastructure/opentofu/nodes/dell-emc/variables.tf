@@ -144,11 +144,19 @@ variable "containers" {
     # invece che dentro Traefik-110: nessuna relazione con Traefik/cloudflared.
     # tun_device = true perché il client deve creare un'interfaccia WireGuard
     # (richiede /dev/net/tun + NET_ADMIN, non garantiti di default in un container
-    # unprivileged con solo nesting). vmid 101: primo libero, i vmid esistenti
-    # (100/110/120/130) lasciano 101-109 liberi.
-    "Netbird-101" = {
-      vmid       = 101
-      ip         = "192.168.10.101/24"
+    # unprivileged con solo nesting).
+    #
+    # vmid 102, non 101: la migrazione a Terraform di dell-emc è graduale, questo
+    # file NON è l'inventario completo dei container reali su pve — esistono LXC
+    # manuali mai dichiarate qui (103/105/106/107/108/109/111/112/116, tra cui
+    # un connector Twingate esistente su 101). Verificato dal vivo con `pct list`
+    # sull'host (non assunto dai vmid presenti in questo file) dopo che un primo
+    # tentativo su vmid 101 ha quasi sovrascritto quel connector — vedi state
+    # rm eseguito il 30/09/2026. Prima di aggiungere un nuovo container qui,
+    # controllare sempre `pct list`/`qm list` sul nodo reale, non solo questo file.
+    "Netbird-102" = {
+      vmid       = 102
+      ip         = "192.168.10.102/24"
       gateway    = "192.168.10.254"
       cores      = 1
       memory     = 512
