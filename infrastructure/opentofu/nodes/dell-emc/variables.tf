@@ -146,17 +146,19 @@ variable "containers" {
     # (richiede /dev/net/tun + NET_ADMIN, non garantiti di default in un container
     # unprivileged con solo nesting).
     #
-    # vmid 102, non 101: la migrazione a Terraform di dell-emc è graduale, questo
-    # file NON è l'inventario completo dei container reali su pve — esistono LXC
-    # manuali mai dichiarate qui (103/105/106/107/108/109/111/112/116, tra cui
-    # un connector Twingate esistente su 101). Verificato dal vivo con `pct list`
-    # sull'host (non assunto dai vmid presenti in questo file) dopo che un primo
-    # tentativo su vmid 101 ha quasi sovrascritto quel connector — vedi state
-    # rm eseguito il 30/09/2026. Prima di aggiungere un nuovo container qui,
-    # controllare sempre `pct list`/`qm list` sul nodo reale, non solo questo file.
-    "Netbird-102" = {
-      vmid       = 102
-      ip         = "192.168.10.102/24"
+    # vmid 113, non 101 né 102: la migrazione a Terraform di dell-emc è graduale,
+    # questo file NON è l'inventario completo delle VM/container reali su pve.
+    # Due tentativi falliti il 30/09/2026 prima di questo: vmid 101 era un LXC
+    # Twingate esistente (mai dichiarato qui), vmid 102 una VM QEMU
+    # "Nextcloud-Ale" da 200G (ID condivisi tra VM e container in Proxmox, non
+    # solo tra container — pct list da solo non basta). Entrambe verificate
+    # intatte dopo l'incidente, rimosse a mano dallo state (tofu state rm).
+    # 113 verificato libero con `pvesh get /cluster/resources --type vm`
+    # (unione VM+container in un colpo solo), non con liste separate. Prima di
+    # aggiungere un nuovo container qui, ripetere quella query sul nodo reale.
+    "Netbird-113" = {
+      vmid       = 113
+      ip         = "192.168.10.113/24"
       gateway    = "192.168.10.254"
       cores      = 1
       memory     = 512
