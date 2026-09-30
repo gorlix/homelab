@@ -157,11 +157,18 @@ variable "containers" {
     # (unione VM+container in un colpo solo), non con liste separate. Prima di
     # aggiungere un nuovo container qui, ripetere quella query sul nodo reale.
     "Netbird-113" = {
-      vmid       = 113
-      ip         = "192.168.10.113/24"
-      gateway    = "192.168.10.254"
-      cores      = 1
-      memory     = 512
+      vmid    = 113
+      ip      = "192.168.10.113/24"
+      gateway = "192.168.10.254"
+      cores   = 1
+      # 512 (valore iniziale) era insufficiente: il ruolo comune fa un `dnf
+      # update -y "*"` completo su ogni nodo (non solo Netbird), e su un Rocky
+      # Linux 9 fresco senza swap questo ha saturato la cgroup memory al 99%
+      # (533M/536M, verificato dal vivo) fino a bloccare pct exec/sshd — non un
+      # problema di rete, di lock o di configurazione. 2048, come
+      # Traefik-110/Minder-130 (stesso schema: nodo leggero ma comunque deve
+      # reggere l'update completo + Docker).
+      memory     = 2048
       disk_size  = 8
       services   = ["netbird"]
       tun_device = true
