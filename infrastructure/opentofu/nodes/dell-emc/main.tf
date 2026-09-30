@@ -93,6 +93,10 @@ resource "proxmox_virtual_environment_container" "rocky_targets" {
   #   ha bisogno di sshd già di nuovo raggiungibile.
   provisioner "local-exec" {
     command = <<-EOT
+      : # no-op quando backup_host_path è null — mai lasciare il comando vuoto:
+      : # OpenTofu rifiuta un local-exec con command="" ("must be a non-empty
+      : # string"), scoperto il 30/09/2026 creando Netbird-113 (primo container
+      : # con backup_host_path=null creato sotto questa versione di Tofu).
       %{if each.value.backup_host_path != null~}
       set -e
       ssh -o StrictHostKeyChecking=no root@192.168.10.199 'chown 100000:100000 ${each.value.backup_host_path} && pct set ${each.value.vmid} -mp0 ${each.value.backup_host_path},mp=/mnt/persistent-backups && pct reboot ${each.value.vmid}'
@@ -119,6 +123,8 @@ resource "proxmox_virtual_environment_container" "rocky_targets" {
   # stesso motivo del reboot già usato per mp0 sopra.
   provisioner "local-exec" {
     command = <<-EOT
+      : # no-op quando tun_device è false — stesso motivo del commento sopra
+      : # sul blocco backup_host_path: mai lasciare il comando vuoto.
       %{if each.value.tun_device~}
       set -e
       ssh -o StrictHostKeyChecking=no root@192.168.10.199 '
