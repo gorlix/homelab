@@ -7,7 +7,8 @@
 # karakeep.alessandrogorla.it (route statica in traefik/dynamic/dynamic.yml).
 services:
   web:
-    image: ghcr.io/karakeep-app/karakeep:${KARAKEEP_VERSION:-release}
+    # Versione fissata: Renovate propone gli aggiornamenti. KARAKEEP_VERSION non è più usata.
+    image: ghcr.io/karakeep-app/karakeep:0.33.2
     restart: unless-stopped
     volumes:
       - ./data:/data
@@ -46,7 +47,8 @@ services:
       # If you want to mount a custom directory, change the volume mapping above instead.
       DATA_DIR: /data # DON'T CHANGE THIS
   chrome:
-    image: ghcr.io/karakeep-app/karakeep-chrome:release
+    # Il tag karakeep-chrome non segue la versione di Karakeep: si usa la versione di Chrome con revisione.
+    image: ghcr.io/karakeep-app/karakeep-chrome:151.0.7922.47-r1
     restart: unless-stopped
     init: true
     command:
