@@ -22,8 +22,11 @@ services:
       # URL pubblico, non ${HOST_IP}: serve a NextAuth per i redirect di
       # login/logout, che passano da Cloudflare -> Traefik.
       NEXTAUTH_URL: https://karakeep.alessandrogorla.it
-      # Registrazione chiusa: servizio esposto su Internet, account creati a mano.
-      DISABLE_SIGNUPS: "true"
+      # Registrazione chiusa di default: servizio esposto su Internet. Per creare
+      # il primo account si mette KARAKEEP_DISABLE_SIGNUPS=false in Infisical,
+      # ci si registra dalla LAN (http://192.168.10.100:3020) prima di creare
+      # l'hostname pubblico, poi si toglie la variabile e si rifà il deploy.
+      DISABLE_SIGNUPS: ${KARAKEEP_DISABLE_SIGNUPS:-true}
 
       # Tagging/riassunti AI via OpenRouter (API compatibile OpenAI, stesso
       # provider già usato da linkwarden). Senza OPENAI_API_KEY in Infisical
