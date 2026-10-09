@@ -40,6 +40,7 @@ Tutti e 3 su **Proxmox VE**.
 - Nextcloud (backup su S3 Cubbit)
 - Authentik (SSO centralizzato)
 - Monitoring infrastruttura
+- Karakeep (bookmark manager, successore di Hoarder) — su `Docker-100`, pubblico come `karakeep.alessandrogorla.it` via Cloudflare Tunnel `Gorla` → Traefik-110 → `192.168.10.100:3020`; segreti su Infisical `prod/karakeep`, signup chiuso di default, tagging AI via OpenRouter, backup notturno su `pve` fuori dalla LXC (stessi limiti di PACA: non 3-2-1)
 - PACA (project management AI-native) — su LXC dedicata `Paca-120`, isolata da `Docker-100` per il rischio `docker.sock` di `agent-runner` (vedi ADR-009)
 - Runner GitHub Actions self-hosted + staging di `project_minder` — su LXC dedicata `Minder-130`, stesso schema di isolamento di `Paca-120`; unità creata ma runner e stack non ancora installati (vedi ADR-011)
 - Nodi Kubernetes (work in progress)
@@ -53,7 +54,7 @@ Tutti e 3 su **Proxmox VE**.
 |---|---|---|
 | Provisioning | OpenTofu (`bpg/proxmox` provider) | Implementato per `dell-emc` (`Docker-100`, `Traefik-110`) — `hp-laptop`/`thinkcentre` non ancora |
 | Config management | Ansible | Implementato per `dell-emc` — stessa estensione mancante di sopra |
-| Servizi | Docker Compose, tracciato direttamente in `docker-compose/` (ADR-008) | Versionato e sanitizzato per i 9 servizi di `dell-emc` — Region A (Home Assistant, AdGuard, Frigate) non ancora |
+| Servizi | Docker Compose, tracciato direttamente in `docker-compose/` (ADR-008) | Versionato e sanitizzato per i 10 servizi di `dell-emc` — Region A (Home Assistant, AdGuard, Frigate) non ancora |
 | Aggiornamenti automatici | Renovate self-hosted (minor/patch in automerge, major e immagini stateful dietro approvazione manuale) + timer systemd per il deploy | Implementato per `dell-emc` (ADR-008) |
 | Orchestrazione | Kubernetes + Flux CD | WIP, non ancora iniziato per davvero |
 | DNS HA | AdGuard Home + **Keepalived/VRRP** (failover IP) + **adguardhome-sync** (bakito/adguardhome-sync, sync config origin→replica) | Documentato in ADR-001 |
@@ -81,7 +82,7 @@ homelab/
 ├── docker-compose/              # stessa cartella, stesso nome, dei nodi reali (es. /opt/docker-compose
 │   │                            # su pve-management) — tracciata direttamente, non una copia separata
 │   │                            # (ADR-008). Servizi reali oggi: 1password-connect, infisical,
-│   │                            # linkwarden, monitoring, traefik, hawser, Semaphore, renovate, paca.
+│   │                            # linkwarden, monitoring, traefik, hawser, Semaphore, renovate, paca, karakeep.
 │   ├── traefik/
 │   ├── adguard/                # non ancora versionato (Region A)
 │   │   ├── keepalived/
@@ -123,7 +124,7 @@ homelab/
 
 **Segreti:** nessun valore in chiaro nel repo. Solo riferimenti `op://vault/item/field` risolti a runtime con 1Password CLI/Connect, o segreti applicativi su Infisical (ADR-007). Gitleaks come pre-commit hook (repo locale e checkout su `pve-management`) è rete di sicurezza aggiuntiva, non la difesa primaria — CI su GitHub ancora da impostare. Attenzione anche a segreti "impliciti": IP pubblici, MAC address, coordinate GPS in config Home Assistant, serial number nei log — vanno sanitizzati a mano. Anche identificativi non tecnicamente segreti ma specifici di una risorsa reale (es. un id di vault) vanno evitati come default hardcoded in script versionati — vedi ADR-006.
 
-**Modifiche a OpenTofu che toccano una LXC con dati (ADR-010):** con il provider `bpg/proxmox`, cambiare `initialization.user_account.keys` o aggiungere un blocco `mount_point` marca `# forces replacement`: la LXC viene distrutta e ricreata con disco nuovo, non aggiornata sul posto. Prima di ogni `apply`: `plan`, cercare `forces replacement` per ogni container, e se c'è, un dump verificato copiato fuori dalla LXC. Non dichiarare mai "in-place" senza averlo visto nel plan. Se un `apply` con provisioner Ansible fallisce, Tofu stampa le chiavi private SSH di tutti i container: chiedere all'utente solo le ultime righe dell'output (PLAY RECAP / task fallito) e rieseguire il deploy con `infrastructure/ansible/run.sh`, non con un nuovo `tofu apply`.
+**Modifiche a OpenTofu che toccano una LXC con dati (ADR-010):** con il provider `bpg/proxmox`, cambiare `initialization.user_account.keys` o aggiungere un blocco `mount_point` marca `# forces replacement`: la LXC viene distrutta e ricreata con disco nuovo, non aggiornata sul posto. Prima di ogni `apply`: `plan`, cercare `forces replacement` per ogni container, e se c'è, un dump verificato copiato fuori dalla LXC. Non dichiarare mai "in-place" senza averlo visto nel plan. I mount (`pct set`) sono gestiti fuori banda e il container resource ha `lifecycle { ignore_changes = [mount_point] }`: senza, il mount aggiunto a mano risulterebbe drift e il plan sostituirebbe la LXC (visto il 09/10/2026 su `Paca-120`). Non rimuovere mai l'`ignore_changes` senza aver riletto il plan. Per deployare un solo servizio con Ansible: `run.sh --limit "<Host>:localhost" -e '{"services":["<nome>"]}'` (con `--limit <Host>` da solo i play su localhost, cioè chiavi 1Password e Infisical, vengono saltati). Se un `apply` con provisioner Ansible fallisce, Tofu stampa le chiavi private SSH di tutti i container: chiedere all'utente solo le ultime righe dell'output (PLAY RECAP / task fallito) e rieseguire il deploy con `infrastructure/ansible/run.sh`, non con un nuovo `tofu apply`.
 
 **Niente emoji nella documentazione.** README, ADR, note del vault e diagrammi non usano emoji decorative (né nei titoli né nelle tabelle di stato): testo semplice, più professionale e stabile per anchor e rendering. Le frecce tipografiche (`→`, `↔`) e i simboli tecnici non sono emoji e restano ammessi.
 

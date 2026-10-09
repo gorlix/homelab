@@ -131,7 +131,7 @@ flowchart TB
 Ogni sito ha il proprio Cloudflare Tunnel e il proprio Traefik, così i due domini di guasto restano separati: un problema in un sito non tocca l'esposizione dell'altro.
 
 - **Region A — Casa:** `hp-laptop` + `thinkcentre` sono un **cluster Proxmox** sulla stessa LAN. Il tunnel Cloudflare di casa fronta Home Assistant e gli altri servizi locali via Traefik su `hp-laptop`. Nessuna porta esposta sul router di casa.
-- **Region B — Ditta:** `dell-emc` è un nodo **Proxmox standalone** ospitato presso l'azienda di famiglia, su una **VLAN dedicata dietro un firewall Cisco gestito e supervisionato da terzi**. Ha un Cloudflare Tunnel ad-hoc e un Traefik proprio per i servizi di produzione (Authentik, Nextcloud, bot, monitoring, PACA — quest'ultimo su una LXC dedicata, vedi [ADR-009](docs/adr/009-paca.md)) e per lo staging di `project_minder` su un'altra LXC dedicata ([ADR-011](docs/adr/011-minder-130-runner-staging.md)).
+- **Region B — Ditta:** `dell-emc` è un nodo **Proxmox standalone** ospitato presso l'azienda di famiglia, su una **VLAN dedicata dietro un firewall Cisco gestito e supervisionato da terzi**. Ha un Cloudflare Tunnel ad-hoc e un Traefik proprio per i servizi di produzione (Authentik, Nextcloud, bot, monitoring, Karakeep, PACA — quest'ultimo su una LXC dedicata, vedi [ADR-009](docs/adr/009-paca.md)) e per lo staging di `project_minder` su un'altra LXC dedicata ([ADR-011](docs/adr/011-minder-130-runner-staging.md)).
 
 ### Interconnessione tra i siti
 
@@ -191,7 +191,8 @@ homelab/
 ├── docker-compose/             # docker-compose per ogni stack — stesso nome/path
 │   │                           # dei nodi reali, tracciata direttamente (ADR-008).
 │   │                           # Reali oggi: 1password-connect, infisical, linkwarden,
-│   │                           # monitoring, traefik, hawser, Semaphore, renovate.
+│   │                           # monitoring, traefik, hawser, Semaphore, renovate,
+│   │                           # paca, karakeep.
 │   ├── traefik/
 │   ├── adguard/                # non ancora versionato (Region A)
 │   ├── frigate/                # non ancora versionato (Region A)
