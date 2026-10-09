@@ -29,6 +29,12 @@ http:
         - web
       service: minder-server
 
+    karakeep:
+      rule: "Host(`karakeep.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: karakeep
+
   services:
     # Infisical e 1Password Connect girano su pve-management (192.168.10.200), un
     # host diverso da quello di Traefik (192.168.10.110): niente docker provider/
@@ -56,3 +62,10 @@ http:
       loadBalancer:
         servers:
           - url: "http://192.168.10.130:80"
+
+    # Karakeep gira su Docker-100 (192.168.10.100), host diverso da Traefik-110:
+    # backend statico come gli altri. Porta 3020, non 3000 (già di linkwarden).
+    karakeep:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.100:3020"

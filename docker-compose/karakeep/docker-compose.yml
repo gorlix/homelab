@@ -1,0 +1,63 @@
+# .env non presente in questa cartella: NEXTAUTH_SECRET, MEILI_MASTER_KEY e
+# (quando presente) OPENAI_API_KEY vivono su Infisical in prod/karakeep (vedi
+# ADR-007), il .env viene generato al deploy dal ruolo Ansible
+# infisical_secrets + docker_service.
+#
+# Gira su Docker-100 (192.168.10.100), esposto da Traefik-110 come
+# karakeep.alessandrogorla.it (route statica in traefik/dynamic/dynamic.yml).
+services:
+  web:
+    image: ghcr.io/karakeep-app/karakeep:${KARAKEEP_VERSION:-release}
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+    ports:
+      # 3000 sull'host è già di linkwarden, 3010 di monitoring.
+      - 3020:3000
+    env_file:
+      - .env
+    environment:
+      MEILI_ADDR: http://meilisearch:7700
+      BROWSER_WEB_URL: http://chrome:9222
+      # URL pubblico, non ${HOST_IP}: serve a NextAuth per i redirect di
+      # login/logout, che passano da Cloudflare -> Traefik.
+      NEXTAUTH_URL: https://karakeep.alessandrogorla.it
+      # Registrazione chiusa: servizio esposto su Internet, account creati a mano.
+      DISABLE_SIGNUPS: "true"
+
+      # Tagging/riassunti AI via OpenRouter (API compatibile OpenAI, stesso
+      # provider già usato da linkwarden). Senza OPENAI_API_KEY in Infisical
+      # l'inferenza resta disattivata e il resto funziona normalmente.
+      # Haiku 5.5: legge immagini (serve a INFERENCE_IMAGE_MODEL), supporta
+      # structured outputs (INFERENCE_OUTPUT_SCHEMA=structured, il default) e
+      # costa quanto gemini-2.5-flash-lite (0.10/0.50 $ per Mtok): per tag e
+      # riassunti brevi un modello grande non aggiunge nulla.
+      OPENAI_BASE_URL: https://openrouter.ai/api/v1
+      INFERENCE_TEXT_MODEL: anthropic/claude-haiku-5.5
+      INFERENCE_IMAGE_MODEL: anthropic/claude-haiku-5.5
+      EMBEDDING_TEXT_MODEL: openai/text-embedding-3-small
+      INFERENCE_LANG: italian
+      INFERENCE_CONTEXT_LENGTH: 4096
+
+      # You almost never want to change the value of the DATA_DIR variable.
+      # If you want to mount a custom directory, change the volume mapping above instead.
+      DATA_DIR: /data # DON'T CHANGE THIS
+  chrome:
+    image: ghcr.io/karakeep-app/karakeep-chrome:release
+    restart: unless-stopped
+    init: true
+    command:
+      - --disable-gpu
+      - --disable-dev-shm-usage
+      - --hide-scrollbars
+      - --disable-blink-features=AutomationControlled
+      - --window-size=1440,900
+  meilisearch:
+    image: getmeili/meilisearch:v1.41.0
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - ./meili_data:/meili_data

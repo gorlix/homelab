@@ -90,7 +90,7 @@ variable "containers" {
       cores     = 4
       memory    = 8192
       disk_size = 50
-      services  = ["linkwarden", "monitoring"]
+      services  = ["linkwarden", "monitoring", "karakeep"]
     }
 
     "Traefik-110" = {
