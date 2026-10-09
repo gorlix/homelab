@@ -64,3 +64,60 @@ services:
       MEILI_NO_ANALYTICS: "true"
     volumes:
       - ./meili_data:/meili_data
+
+  # Backup notturno di ./data verso /mnt/persistent-backups, bind mount della
+  # LXC su una directory di `pve` (backup_host_path in variables.tf, stesso
+  # schema di PACA, vedi ADR-010): sopravvive a un destroy+recreate di
+  # Docker-100. Database con `.backup` di SQLite (copia coerente anche con
+  # Karakeep acceso, un `cp` del file mentre scrive no) verificato con
+  # quick_check, più gli assets in tar. meili_data escluso: è un indice
+  # ricostruibile dal pannello admin di Karakeep.
+  # Restore: fermare web, estrarre l'archivio in ./data, riavviare, reindex.
+  backup:
+    image: alpine:3.22
+    restart: unless-stopped
+    environment:
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+      BACKUP_CRON: ${BACKUP_CRON:-0 3 * * *}
+      TZ: ${TZ:-Europe/Rome}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        apk add --no-cache sqlite tzdata >/dev/null
+        # crond non passa l'environment del container ai job: va su file.
+        echo "BACKUP_RETENTION_DAYS=$$BACKUP_RETENTION_DAYS" > /etc/backup.env
+        cat > /usr/local/bin/run-backup.sh <<'EOS'
+        #!/bin/sh
+        set -e -o pipefail
+        . /etc/backup.env
+        ts="$$(date +%Y%m%d-%H%M%S)"
+        stage="/tmp/karakeep-$${ts}"
+        tmp="/backups/.karakeep-$${ts}.tar.gz.tmp"
+        out="/backups/karakeep-$${ts}.tar.gz"
+        mkdir -p "$$stage"
+        if sqlite3 /data/db.db ".backup '$$stage/db.db'" \
+          && sqlite3 /data/queue.db ".backup '$$stage/queue.db'" \
+          && [ "$$(sqlite3 "$$stage/db.db" 'PRAGMA quick_check;')" = "ok" ] \
+          && cp -a /data/assets "$$stage/assets" \
+          && tar -czf "$$tmp" -C "$$stage" .; then
+          mv "$$tmp" "$$out"
+          echo "Backup written: $$out"
+          find /backups -maxdepth 1 -name 'karakeep-*.tar.gz' -mtime "+$${BACKUP_RETENTION_DAYS}" -delete
+        else
+          echo "Backup failed at $${ts}" >&2
+          rm -f "$$tmp"
+        fi
+        rm -rf "$$stage"
+        EOS
+        chmod +x /usr/local/bin/run-backup.sh
+        mkdir -p /var/spool/cron/crontabs
+        echo "$$BACKUP_CRON /usr/local/bin/run-backup.sh >>/proc/1/fd/1 2>>/proc/1/fd/2" > /var/spool/cron/crontabs/root
+        echo "Karakeep backup service started — schedule: $$BACKUP_CRON $$TZ (retention: $$BACKUP_RETENTION_DAYS days)."
+        exec crond -f -d 8
+    volumes:
+      # rw, non ro: `.backup` deve poter prendere i lock (file -shm della WAL).
+      - ./data:/data
+      - ${BACKUP_DIR:-/mnt/persistent-backups}:/backups
+    depends_on:
+      - web
