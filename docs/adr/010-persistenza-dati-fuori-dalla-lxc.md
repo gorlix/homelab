@@ -98,15 +98,36 @@ docker compose up -d
 > - Errori latenti trovati e corretti: immagine MinIO non più su Docker Hub, thin pool sovra-allocato, `apply.sh` che appende `-var` a comandi che non lo accettano (`state rm`).
 
 > [!WARNING] Da tenere presente
-> - **Dati persi, non recuperabili.** Tutto ciò che è stato scritto in PACA dopo il backup trovato in cache e prima del 14/09 è perso, e non so quantificarlo. Quel che è stato scritto tra il dump di sicurezza del 16/09 e la distruzione del 17/09 è perso a sua volta. Gli **allegati su MinIO** non erano nel dump e non sono recuperabili: se il database li referenzia, risultano mancanti. I **plugin** `checklist` e `github` di PACA vivevano nel volume `/plugins`, anch'esso perso: l'API li segnala come non caricabili e vanno reinstallati dall'interfaccia.
+> - **Dati persi, non recuperabili.** Tutto ciò che è stato scritto in PACA dopo il backup trovato in cache e prima del 14/09 è perso, e non so quantificarlo. Quel che è stato scritto tra il dump di sicurezza del 16/09 e la distruzione del 17/09 è perso a sua volta. Il **volume MinIO** è perso e non era nel dump. Verificato sul database ripristinato: `files` e `task_attachments` sono vuote (nessun allegato perso), mentre 3 utenti su 5 avevano un avatar, ora un riferimento a un oggetto inesistente (`404` nel browser) da ricaricare dal profilo. I **plugin** `checklist` e `github` di PACA vivevano nel volume `/plugins`, anch'esso perso: l'API li segnala come non caricabili e vanno reinstallati dall'interfaccia.
 > - **Questa non è una strategia 3-2-1.** La directory sta sul volume root di `pve` (`pve-root`): sopravvive alla distruzione della LXC, ma non alla perdita del nodo o del suo disco. Manca una seconda copia fuori dall'host (S3 o simile).
 > - **Un `agent-runner` compromesso può cancellare i propri backup.** Il motivo per cui `Paca-120` esiste ([ADR-009](009-paca.md)) è che `agent-runner` ha accesso a `docker.sock`, cioè è root sulla LXC, e la LXC ha il bind mount in scrittura sulla directory dei backup. Il rischio che l'isolamento doveva contenere non è coperto da questo meccanismo. Una copia pull-based da `pve` verso un altro posto risolverebbe.
 > - **Il bind mount è applicato solo alla creazione.** Il provisioner `local-exec` gira quando la LXC viene creata, non ad ogni `apply`. Per una LXC esistente il mount va aggiunto a mano con `pct set`; un'eventuale deriva non viene rilevata.
+> - **Con l'`ignore_changes` OpenTofu non vede più i mount.** Dal 09/10/2026 la risorsa container ignora `mount_point`: la deriva dei mount è invisibile, non solo "non rilevata alla creazione". Se un giorno volessi dichiarare un blocco `mount_point` in HCL, l'`ignore_changes` va riconsiderato, e il bind mount resterebbe comunque non creabile via API (vedi sopra). La lezione è un'altra: il mount fuori banda aveva reso lo state bugiardo, e a segnalarlo è stato solo il plan letto prima dell'`apply`.
+> - **Anche i backup di Karakeep hanno gli stessi limiti.** Stanno su `pve-root` (non 3-2-1, muoiono con il disco del nodo) e il root di `Docker-100` può cancellarli. Retention di 7 giorni; l'indice Meilisearch non è nel backup (si ricostruisce dal pannello admin).
 > - **Le chiavi SSH restano da ruotare bene.** Sono state esposte in chat tre volte in questa sessione (`Docker-100` mai ruotata). Ruotarle oggi ricreerebbe di nuovo le LXC. La correzione strutturale non è ancora fatta: scollegare le chiavi da `initialization.user_account.keys` (con `ignore_changes`) e passarle al provisioner via `environment` invece che nel testo del comando, così una rotazione non ricrea più i container e un errore non le stampa.
 > - **`terraform_data.run_ansible` è rimasto `tainted`** dopo il fallimento, e il prossimo `tofu apply` rieseguirebbe l'intero playbook. Va fatto `tofu untaint`, oppure usato `run.sh` per i deploy.
 > - **ADR-009 aveva dato l'impressione sbagliata.** Documentava la precedente rotazione delle chiavi come avvenuta senza problemi. Quella volta `Paca-120` era appena stata deployata, quindi con ogni probabilità fu ricreata già allora, senza dati da perdere e senza che nessuno se ne accorgesse. Non è stato verificato a posteriori.
 > - **Il thin pool `local-lvm` resta sovra-allocato.** `fstrim` l'ha portato al 70%, ma senza un `pct fstrim` periodico si riempie di nuovo. Non ho ancora configurato né il cron né un alert sul `Data%`: al 100% le scritture falliscono per tutte le LXC sul pool, produzione compresa.
 > - **Errori di processo** (vedi [ADR-000](000-metodologia-ai.md) sull'uso dell'assistenza AI). La rotazione è stata presentata come "in-place" dall'assistente AI, che si è fidato del precedente di ADR-009 senza verificarlo nel plan; l'`apply` è stato poi confermato senza rileggere il plan fino a `forces replacement`. Con il `mount_point` la sostituzione era invece nota e accettata, con un dump verificato fuori dalla LXC; quello che non era previsto è che l'API rifiutasse la creazione **dopo** la distruzione, lasciando il container inesistente per giorni (con lo stesso vmid non esiste un `create_before_destroy`). Nel primo caso il plan era leggibile e non è stato letto con abbastanza attenzione. La regola al punto 3 della Decisione nasce da qui.
+
+## Aggiornamento del 09/10/2026: il mount fuori banda faceva mentire lo state
+
+Un `tofu plan` di sola lettura, lanciato il 09/10/2026, ha mostrato:
+
+```
+proxmox_virtual_environment_container.rocky_targets["Paca-120"] must be replaced
+  mount_point {  # forces replacement
+    volume = "/var/lib/pve-persistent/paca-backups" -> null
+  }
+```
+
+Il bind mount `mp0` era stato aggiunto a mano con `pct set` (vedi Decisione, punto 2): per il provider `bpg/proxmox` non esisteva nello state né nell'HCL, quindi era una deriva da rimuovere, e `mount_point` forza la sostituzione. Di conseguenza **qualunque `tofu apply` da metà settembre in poi avrebbe distrutto di nuovo `Paca-120`**: lo stesso incidente di questo ADR, causato dal meccanismo introdotto per evitarlo. A intercettarlo è stato il `plan` prima dell'`apply` prescritto al punto 3.
+
+La correzione (commit `2b0f6f6`) è un `lifecycle { ignore_changes = [mount_point] }` sulla risorsa container in `infrastructure/opentofu/nodes/dell-emc/main.tf`. Dopo la modifica il plan non mostra più nessuna sostituzione di LXC, solo `local_file.ansible_inventory` e `terraform_data.run_ansible`, innocui.
+
+Lo stesso schema è ora usato da `Docker-100` per Karakeep: `mp0` aggiunto a mano con `pct set` più `pct reboot 100` (il container esisteva già, quindi il provisioner di creazione non è mai girato), directory `/var/lib/pve-persistent/karakeep-backups` su `pve` montata in `/mnt/persistent-backups`, e `backup_host_path` valorizzato in `variables.tf` per documentazione e coerenza. Senza l'`ignore_changes` avrebbe riprodotto lo stesso problema anche su `Docker-100`.
+
+Nota operativa emersa nello stesso lavoro: `infrastructure/ansible/run.sh --limit <Host>` da solo salta i play su localhost (chiavi SSH da 1Password e segreti da Infisical) e fallisce con `Permission denied (publickey)`. Va usato `--limit "<Host>:localhost"`, e `-e '{"services":["<nome>"]}'` per deployare un solo servizio. È così che Karakeep è stato deployato senza toccare `Paca-120`.
 
 ## Riferimenti
 
