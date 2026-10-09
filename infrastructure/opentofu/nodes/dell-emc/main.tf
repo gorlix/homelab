@@ -63,6 +63,15 @@ resource "proxmox_virtual_environment_container" "rocky_targets" {
     bridge = "vmbr0"
   }
 
+  # I bind mount (mp0 di backup_host_path) li crea `pct set` via SSH, non
+  # questa resource (l'API rifiuta i bind mount ai token, vedi sotto). Senza
+  # ignore_changes il provider li legge come drift da rimuovere e, siccome
+  # mount_point "forces replacement", un apply distruggerebbe la LXC: il
+  # 09/10/2026 `plan` voleva ricreare Paca-120 proprio per il suo mp0.
+  lifecycle {
+    ignore_changes = [mount_point]
+  }
+
   # AUTO-SETUP SSH: Installa openssh-server, genera le chiavi host ed avvia il servizio
   provisioner "local-exec" {
     command = "ssh -o StrictHostKeyChecking=no root@192.168.10.199 'pct exec ${each.value.vmid} -- bash -c \"dnf install -y openssh-server && ssh-keygen -A && systemctl enable --now sshd\"'"
