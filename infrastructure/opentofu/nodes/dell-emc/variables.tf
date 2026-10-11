@@ -178,6 +178,20 @@ variable "containers" {
       tun_device = true
     }
 
+    # LXC dedicata al runner GitLab CI: monta docker.sock per l'executor
+    # docker, quindi ogni job è di fatto root su questa LXC. Isolata per lo
+    # stesso motivo di Paca-120/Minder-130: niente dati né altri servizi qui.
+    # Nessuna esposizione pubblica: il runner si collega lui verso GitLab.
+    "GitlabRunner-114" = {
+      vmid      = 114
+      ip        = "192.168.10.114/24"
+      gateway   = "192.168.10.254"
+      cores     = 2
+      memory    = 2048
+      disk_size = 10
+      services  = ["gitlab-runner"]
+    }
+
     # Per aggiungere macchine future basterà inserire qui nuovi blocchi, ad esempio:
     # "rocky-target-101" = {
     #   vmid      = 101

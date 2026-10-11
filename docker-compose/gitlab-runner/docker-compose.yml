@@ -1,0 +1,17 @@
+# Runner GitLab CI su GitlabRunner-114 (LXC dedicata, vedi variables.tf).
+# Nessun .env: la registrazione (token glrt-... creato nella UI di GitLab)
+# si fa una volta con `gitlab-runner register` e finisce in
+# ./config/config.toml, sul disco della LXC. Se la LXC viene ricreata il
+# runner va ri-registrato: il token non è un dato da salvare, se ne genera
+# uno nuovo.
+services:
+  gitlab-runner:
+    # Versione fissata: Renovate propone gli aggiornamenti.
+    image: gitlab/gitlab-runner:v19.4.1
+    container_name: gitlab-runner
+    restart: unless-stopped
+    volumes:
+      # Executor docker: i job girano come container fratelli sul Docker della
+      # LXC. Chi controlla docker.sock è root sull'host, da qui l'isolamento.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./config:/etc/gitlab-runner
