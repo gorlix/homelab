@@ -4,6 +4,13 @@
 # ./config/config.toml, sul disco della LXC. Se la LXC viene ricreata il
 # runner va ri-registrato: il token non è un dato da salvare, se ne genera
 # uno nuovo.
+#
+# I job possono fare `docker build` via socket binding, non DinD privilegiato:
+# dopo il register, in config.toml sotto [runners.docker]
+#   volumes = ["/cache", "/var/run/docker.sock:/var/run/docker.sock"]
+# (aggiunto a mano l'11/10/2026, config.toml non è versionato perché contiene
+# il token). Ogni job è quindi root su questa LXC (unprivileged: non su `pve`)
+# e vede i container degli altri job: accettabile solo perché la LXC è dedicata.
 services:
   gitlab-runner:
     # Versione fissata: Renovate propone gli aggiornamenti.
@@ -15,3 +22,18 @@ services:
       # LXC. Chi controlla docker.sock è root sull'host, da qui l'isolamento.
       - /var/run/docker.sock:/var/run/docker.sock
       - ./config:/etc/gitlab-runner
+
+  # Le build lasciano immagini e cache sul disco della LXC, che sta sul thin
+  # pool local-lvm di `pve`: sovra-allocato e già arrivato al 100% una volta
+  # (settembre 2026, scritture bloccate su tutte le LXC). Pulizia ogni notte
+  # di immagini, container fermi e build cache più vecchi di 3 giorni.
+  docker-prune:
+    image: docker:29.9.0-cli
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "0 4 * * * docker system prune -af --filter until=72h && docker builder prune -af --filter until=72h" > /etc/crontabs/root
+        exec crond -f -l 8
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
