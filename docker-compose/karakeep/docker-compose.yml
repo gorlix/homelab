@@ -76,7 +76,7 @@ services:
   # ricostruibile dal pannello admin di Karakeep.
   # Restore: fermare web, estrarre l'archivio in ./data, riavviare, reindex.
   backup:
-    image: alpine:3.22
+    image: alpine:3.24
     restart: unless-stopped
     environment:
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
