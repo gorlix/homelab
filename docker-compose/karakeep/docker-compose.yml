@@ -29,6 +29,16 @@ services:
       # l'hostname pubblico, poi si toglie la variabile e si rifà il deploy.
       DISABLE_SIGNUPS: ${KARAKEEP_DISABLE_SIGNUPS:-true}
 
+      # Login SSO con Authentik (ADR-003, da scrivere). OAUTH_CLIENT_ID e
+      # OAUTH_CLIENT_SECRET stanno in Infisical prod/karakeep. Redirect URI da
+      # registrare sul provider: https://karakeep.alessandrogorla.it/api/auth/callback/custom
+      OAUTH_WELLKNOWN_URL: https://auth.alessandrogorla.it/application/o/karakeep/.well-known/openid-configuration
+      OAUTH_PROVIDER_NAME: Authentik
+      # Collega il login Authentik all'account locale già esistente con la
+      # stessa email. "Dangerous" con un provider di terzi (chi controlla
+      # l'email ruba l'account): qui il provider è Authentik, gestito da me.
+      OAUTH_ALLOW_DANGEROUS_EMAIL_ACCOUNT_LINKING: "true"
+
       # Tagging/riassunti AI via OpenRouter (API compatibile OpenAI, stesso
       # provider già usato da linkwarden). Senza OPENAI_API_KEY in Infisical
       # l'inferenza resta disattivata e il resto funziona normalmente.
