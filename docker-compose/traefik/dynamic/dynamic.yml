@@ -50,6 +50,14 @@ http:
         - web
       service: authentik
 
+    # Agent del Traefik Manager di casa (vedi docker-compose.yml): il TM lo
+    # chiama in HTTPS, il TLS lo termina Cloudflare.
+    traefik-manager-agent:
+      rule: "Host(`tma-gorla.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: traefik-manager-agent
+
   services:
     # Infisical e 1Password Connect girano su pve-management (192.168.10.200), un
     # host diverso da quello di Traefik (192.168.10.110): niente docker provider/
@@ -102,3 +110,10 @@ http:
       loadBalancer:
         servers:
           - url: "http://192.168.10.111:9000"
+
+    # Stesso host e stessa rete Docker (traefik_proxy) di Traefik: nome del
+    # container invece dell'IP, la porta 8090 non è pubblicata.
+    traefik-manager-agent:
+      loadBalancer:
+        servers:
+          - url: "http://traefik-manager-agent:8090"

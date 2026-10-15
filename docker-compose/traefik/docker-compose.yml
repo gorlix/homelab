@@ -1,6 +1,6 @@
-# .env (solo TUNNEL_TOKEN per cloudflared) non presente in questa cartella:
-# migrato su Infisical (vedi ADR-007), generato al deploy dal ruolo Ansible
-# infisical_secrets + docker_service.
+# .env (TUNNEL_TOKEN per cloudflared, TMA_API_KEY per traefik-manager-agent)
+# non presente in questa cartella: migrato su Infisical (vedi ADR-007), generato
+# al deploy dal ruolo Ansible infisical_secrets + docker_service.
 services:
   traefik:
     image: traefik:v3.7.10
@@ -22,6 +22,12 @@ services:
       # restano non fidati. Se traefik_proxy venisse ricreata con un'altra subnet,
       # questo valore va aggiornato.
       - --entrypoints.web.forwardedHeaders.trustedIPs=172.19.0.0/16
+      # API (senza dashboard) per traefik-manager-agent. api.insecure la serve
+      # sull'entrypoint interno "traefik" (:8080), che NON è pubblicato: la
+      # raggiungono solo i container su traefik_proxy (cloudflared e l'agent),
+      # nessuna route del tunnel punta lì.
+      - --api=true
+      - --api.insecure=true
       - --api.dashboard=false
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -47,6 +53,38 @@ services:
       - traefik_proxy
     depends_on:
       - traefik
+
+  # Agent di Traefik Manager (chr0nzz/traefik-manager): permette al Traefik
+  # Manager della Region A (traefik.alessandrogorla.it) di vedere router,
+  # servizi e salute di questo Traefik. Solo monitoring: dynamic/ è montata
+  # :ro perché dynamic.yml è versionato in Git e Ansible lo sovrascrive a ogni
+  # deploy — una route creata dalla UI andrebbe persa e uscirebbe dal GitOps.
+  # Dalla UI una modifica su questo server fallisce in scrittura, by design.
+  # Raggiunto dal TM via tunnel Gorla (tma-gorla.alessandrogorla.it, route in
+  # dynamic/dynamic.yml), TLS di Cloudflare: nessuna porta pubblicata. L'unica
+  # credenziale è TMA_API_KEY (generata in TM, Settings - Agents), con il rate
+  # limit dell'agent come unico freno a tentativi a forza bruta.
+  traefik-manager-agent:
+    image: ghcr.io/chr0nzz/traefik-manager-agent:1.15.2
+    container_name: traefik-manager-agent
+    restart: unless-stopped
+    environment:
+      - TMA_API_KEY=${TMA_API_KEY:?TMA_API_KEY mancante nel .env generato da Infisical}
+      - TRAEFIK_API_URL=http://traefik:8080
+      - CONFIG_PATH=/app/config
+      # Non root: deve solo leggere dynamic/ (0644) e scrivere i propri backup.
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ./dynamic:/app/config:ro
+      - tma_backups:/app/backups
+    networks:
+      - traefik_proxy
+    depends_on:
+      - traefik
+
+volumes:
+  tma_backups:
 
 networks:
   traefik_proxy:
