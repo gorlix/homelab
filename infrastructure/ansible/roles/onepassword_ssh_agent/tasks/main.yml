@@ -38,3 +38,36 @@
     label: "{{ fetched.item }}"
   no_log: true
   changed_when: true
+
+# Con tutte le chiavi nell'agent, ssh le offre una dopo l'altra e sshd chiude
+# dopo MaxAuthTries (6): oltre il sesto nodo l'host giusto non arrivava mai
+# ("Too many authentication failures", visto il 15/10/2026 su Traefik-110,
+# settimo di 7). La pubblica di ogni nodo va in ssh_pubkey_dir, e
+# group_vars/docker_nodes.yml fa offrire a ssh solo quella (IdentitiesOnly).
+- name: Crea la cartella delle chiavi pubbliche dei nodi (tmpfs)
+  ansible.builtin.file:
+    path: "{{ ssh_pubkey_dir }}"
+    state: directory
+    mode: '0700'
+
+- name: Deriva la chiave pubblica di ciascun nodo dalla privata recuperata
+  ansible.builtin.command:
+    cmd: ssh-keygen -y -f /dev/stdin
+    stdin: "{{ fetched.field }}"
+  loop: "{{ onepassword_ssh_agent_fetched.results }}"
+  loop_control:
+    loop_var: fetched
+    label: "{{ fetched.item }}"
+  register: onepassword_ssh_agent_pubkeys
+  no_log: true
+  changed_when: false
+
+- name: Scrive la chiave pubblica di ciascun nodo in ssh_pubkey_dir
+  ansible.builtin.copy:
+    dest: "{{ ssh_pubkey_dir }}/{{ derived.fetched.item }}.pub"
+    content: "{{ derived.stdout }}\n"
+    mode: '0644'
+  loop: "{{ onepassword_ssh_agent_pubkeys.results }}"
+  loop_control:
+    loop_var: derived
+    label: "{{ derived.fetched.item }}"

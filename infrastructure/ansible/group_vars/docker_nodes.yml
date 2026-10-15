@@ -1,0 +1,8 @@
+# L'ssh-agent di run.sh / del provisioner OpenTofu contiene la chiave privata di
+# TUTTI i nodi. Senza questi due parametri ssh le prova in ordine e sshd chiude
+# dopo MaxAuthTries (6): con 7 nodi, l'ultimo era irraggiungibile ("Too many
+# authentication failures", Traefik-110, 15/10/2026). IdentityFile punta alla
+# chiave PUBBLICA del nodo: ssh usa la privata corrispondente che sta nell'agent,
+# e con IdentitiesOnly offre solo quella.
+ansible_ssh_private_key_file: "{{ ssh_pubkey_dir }}/{{ inventory_hostname }}.pub"
+ansible_ssh_common_args: "-o IdentitiesOnly=yes"

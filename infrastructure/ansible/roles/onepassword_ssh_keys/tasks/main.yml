@@ -77,3 +77,21 @@
   loop_control:
     label: "{{ item.key }}"
   no_log: true
+
+# Stesso motivo del ruolo onepassword_ssh_agent: nel percorso OpenTofu tutte le
+# chiavi sono nell'agent, ssh deve offrire a ogni nodo solo la sua (vedi
+# group_vars/docker_nodes.yml).
+- name: Crea la cartella delle chiavi pubbliche dei nodi (tmpfs)
+  ansible.builtin.file:
+    path: "{{ ssh_pubkey_dir }}"
+    state: directory
+    mode: '0700'
+
+- name: Scrive la chiave pubblica di ciascun nodo in ssh_pubkey_dir
+  ansible.builtin.copy:
+    dest: "{{ ssh_pubkey_dir }}/{{ item.key }}.pub"
+    content: "{{ item.value.public_key }}\n"
+    mode: '0644'
+  loop: "{{ container_ssh_keys | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"

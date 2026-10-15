@@ -1,0 +1,4 @@
+# Chiavi pubbliche dei nodi, scritte da onepassword_ssh_keys (percorso OpenTofu)
+# o onepassword_ssh_agent (percorso run.sh) prima di qualsiasi connessione SSH.
+# Su tmpfs: sono solo pubbliche, ma non serve che sopravvivano a un riavvio.
+ssh_pubkey_dir: /run/ansible-ssh-pubkeys
