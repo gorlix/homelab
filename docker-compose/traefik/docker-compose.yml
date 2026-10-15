@@ -29,9 +29,17 @@ services:
       - --api=true
       - --api.insecure=true
       - --api.dashboard=false
+      # Access log JSON per la vista log del Traefik Manager (letto dall'agent).
+      # Contiene l'IP reale dei client (vedi trustedIPs sopra): resta nel volume
+      # traefik_logs, non esce dall'host. Traefik non ruota da solo, ci pensa il
+      # servizio accesslog-rotate più sotto.
+      - --accesslog=true
+      - --accesslog.filepath=/var/log/traefik/access.log
+      - --accesslog.format=json
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./dynamic:/etc/traefik/dynamic:ro
+      - traefik_logs:/var/log/traefik
     ports:
       # Pubblicata sull'host invece di usare il nome Docker interno "traefik:80":
       # il connector cloudflared di QUESTO host è l'unico rimasto sul tunnel (il
@@ -72,6 +80,7 @@ services:
       - TMA_API_KEY=${TMA_API_KEY:?TMA_API_KEY mancante nel .env generato da Infisical}
       - TRAEFIK_API_URL=http://traefik:8080
       - CONFIG_PATH=/app/config
+      - ACCESS_LOG_PATH=/logs/access.log
       # Niente PUID/PGID: con un utente non root l'entrypoint esige /app/config
       # scrivibile e si rifiuta di partire con il mount :ro (verificato il
       # 16/10/2026, crash loop). Gira quindi come root nel container, ma :ro
@@ -79,13 +88,42 @@ services:
     volumes:
       - ./dynamic:/app/config:ro
       - tma_backups:/app/backups
+      - traefik_logs:/logs:ro
     networks:
       - traefik_proxy
     depends_on:
       - traefik
 
+  # Rotazione dell'access log: Traefik non la fa e il disco di Traefik-110 sta
+  # sul thin pool local-lvm di pve, già vicino al pieno. Ogni ora, sopra i
+  # 50 MB, copia il file in access.log.1 (sovrascrivendo la copia precedente) e
+  # tronca l'originale: Traefik scrive in append, quindi continua sullo stesso
+  # file senza riavvio. Occupazione massima ~100 MB. Le righe scritte tra copia
+  # e troncamento si perdono: accettabile per un log di sola consultazione.
+  accesslog-rotate:
+    image: alpine:3.24
+    container_name: traefik-accesslog-rotate
+    restart: unless-stopped
+    environment:
+      MAX_BYTES: 52428800
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          f=/logs/access.log
+          if [ -f "$$f" ] && [ "$$(stat -c %s "$$f")" -gt "$$MAX_BYTES" ]; then
+            cp "$$f" "$$f.1" && : > "$$f"
+            echo "ruotato $$(date -Iseconds)"
+          fi
+          sleep 3600
+        done
+    volumes:
+      - traefik_logs:/logs
+    network_mode: none
+
 volumes:
   tma_backups:
+  traefik_logs:
 
 networks:
   traefik_proxy:
