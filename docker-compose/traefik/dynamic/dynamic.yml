@@ -44,6 +44,12 @@ http:
         - web
       service: openmausbot
 
+    authentik:
+      rule: "Host(`auth.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: authentik
+
   services:
     # Infisical e 1Password Connect girano su pve-management (192.168.10.200), un
     # host diverso da quello di Traefik (192.168.10.110): niente docker provider/
@@ -87,3 +93,12 @@ http:
           - url: "http://192.168.10.117:8080"
         responseForwarding:
           flushInterval: "-1"
+
+    # Authentik gira sulla LXC 111 (192.168.10.111), host diverso da Traefik-110:
+    # backend statico. Porta HTTP 9000: il TLS lo termina Cloudflare, lo schema
+    # originale arriva ad Authentik via X-Forwarded-Proto (vedi trustedIPs
+    # sull'entrypoint web in docker-compose.yml).
+    authentik:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.111:9000"

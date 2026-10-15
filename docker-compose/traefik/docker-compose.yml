@@ -13,6 +13,15 @@ services:
       - --providers.file.directory=/etc/traefik/dynamic
       - --providers.file.watch=true
       - --entrypoints.web.address=:80
+      # Fidarsi degli X-Forwarded-* che arrivano da cloudflared (rete traefik_proxy):
+      # senza, Traefik li sovrascrive con lo schema del proprio hop (http) e i
+      # backend credono di essere serviti in chiaro. Authentik >= 2026.8 genera
+      # così URL http:// e il login si rompe per mixed content. Sulla rete ci sono
+      # solo cloudflared e traefik; le richieste a 192.168.10.110:80 arrivano dal
+      # gateway 172.19.0.1, mentre i client LAN diretti tengono il proprio IP e
+      # restano non fidati. Se traefik_proxy venisse ricreata con un'altra subnet,
+      # questo valore va aggiornato.
+      - --entrypoints.web.forwardedHeaders.trustedIPs=172.19.0.0/16
       - --api.dashboard=false
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
