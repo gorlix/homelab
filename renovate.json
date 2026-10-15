@@ -35,7 +35,7 @@
     },
     {
       "description": "OpenMausBot è pre-1.0 e rilascia più volte al giorno: con 0.1.x ogni bump conterebbe come patch e finirebbe in automerge. In più l'immagine viene ricostruita in locale con le CLI degli engine (Dockerfile in docker-compose/openmausbot/) e il volume /data contiene stato e login: niente automerge, approvazione esplicita dalla Dependency Dashboard e almeno 7 giorni di età (ADR-012).",
-      "matchPackageNames": ["ghcr.io/milind-soni/openmausbot", "@anthropic-ai/claude-code", "@openai/codex"],
+      "matchPackageNames": ["ghcr.io/milind-soni/openmausbot", "@anthropic-ai/claude-code", "@openai/codex", "opencode-ai"],
       "automerge": false,
       "dependencyDashboardApproval": true,
       "minimumReleaseAge": "7 days"

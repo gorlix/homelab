@@ -100,7 +100,9 @@ services:
     command:
       - |
         set -e
-        apk add --no-cache sqlite tzdata >/dev/null
+        # tar GNU, non quello di busybox: --exclude su un path preciso
+        # (.openmausbot/tools) deve funzionare come documentato.
+        apk add --no-cache sqlite tzdata tar >/dev/null
         # crond non passa l'environment del container ai job: va su file.
         echo "BACKUP_RETENTION_DAYS=$$BACKUP_RETENTION_DAYS" > /etc/backup.env
         cat > /usr/local/bin/run-backup.sh <<'EOS'
@@ -125,13 +127,15 @@ services:
             ok=0
           fi
         done
-        # Il resto della HOME, senza i file SQLite live (già copiati sopra) e
-        # senza cache ricostruibili.
+        # Il resto della HOME, senza i file SQLite live (già copiati sopra),
+        # senza cache ricostruibili e senza .openmausbot/tools: il runtime
+        # Antigravity (circa 1.9 GB) che OpenMausBot riscarica dalla UI.
         if [ "$$ok" = 1 ] \
           && tar -czf "$$stage/home.tar.gz" -C /data \
                --exclude='*.db' --exclude='*.sqlite' \
                --exclude='*-wal' --exclude='*-shm' \
-               --exclude='.cache' --exclude='.npm' . \
+               --exclude='.cache' --exclude='.npm' \
+               --exclude='./.openmausbot/tools' . \
           && tar -czf "$$tmp" -C "$$stage" .; then
           mv "$$tmp" "$$out"
           echo "Backup written: $$out"
