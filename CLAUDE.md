@@ -43,6 +43,7 @@ Tutti e 3 su **Proxmox VE**.
 - Karakeep (bookmark manager, successore di Hoarder) — su `Docker-100`, pubblico come `karakeep.alessandrogorla.it` via Cloudflare Tunnel `Gorla` → Traefik-110 → `192.168.10.100:3020`; segreti su Infisical `prod/karakeep`, signup chiuso di default, tagging AI via OpenRouter, backup notturno su `pve` fuori dalla LXC (stessi limiti di PACA: non 3-2-1)
 - PACA (project management AI-native) — su LXC dedicata `Paca-120`, isolata da `Docker-100` per il rischio `docker.sock` di `agent-runner` (vedi ADR-009)
 - Runner GitHub Actions self-hosted + staging di `project_minder` — su LXC dedicata `Minder-130`, stesso schema di isolamento di `Paca-120`; unità creata ma runner e stack non ancora installati (vedi ADR-011)
+- OpenMausBot (harness self-hosted che fa girare agenti AI come bot in una chat, con shell reale) — su LXC dedicata `Maus-117` (`192.168.10.117`), pubblico come `maus.alessandrogorla.it` via Cloudflare Tunnel `Gorla` → Traefik-110 → `192.168.10.117:8080` (Caddy), auth = pairing del server (niente Authentik forward-auth); prima unità chiusa dal firewall Proxmox (`firewall.tf`: ingresso solo da Traefik-110 e SSH da `pve-management`, niente reti private in uscita, richiede firewall datacenter attivo), backup notturno best-effort su `pve` fuori dalla LXC (stessi limiti di PACA/Karakeep: non 3-2-1, contiene token degli engine), niente automerge Renovate (pre-1.0) (vedi ADR-012)
 - Nodi Kubernetes (work in progress)
 - Traefik (reverse proxy della Region B)
 - Cloudflare Tunnel (ad-hoc per la Region B)
@@ -54,7 +55,7 @@ Tutti e 3 su **Proxmox VE**.
 |---|---|---|
 | Provisioning | OpenTofu (`bpg/proxmox` provider) | Implementato per `dell-emc` (`Docker-100`, `Traefik-110`) — `hp-laptop`/`thinkcentre` non ancora |
 | Config management | Ansible | Implementato per `dell-emc` — stessa estensione mancante di sopra |
-| Servizi | Docker Compose, tracciato direttamente in `docker-compose/` (ADR-008) | Versionato e sanitizzato per i 10 servizi di `dell-emc` — Region A (Home Assistant, AdGuard, Frigate) non ancora |
+| Servizi | Docker Compose, tracciato direttamente in `docker-compose/` (ADR-008) | Versionato e sanitizzato per gli 11 servizi di `dell-emc` — Region A (Home Assistant, AdGuard, Frigate) non ancora |
 | Aggiornamenti automatici | Renovate self-hosted (minor/patch in automerge, major e immagini stateful dietro approvazione manuale) + timer systemd per il deploy | Implementato per `dell-emc` (ADR-008) |
 | Orchestrazione | Kubernetes + Flux CD | WIP, non ancora iniziato per davvero |
 | DNS HA | AdGuard Home + **Keepalived/VRRP** (failover IP) + **adguardhome-sync** (bakito/adguardhome-sync, sync config origin→replica) | Documentato in ADR-001 |
@@ -82,7 +83,7 @@ homelab/
 ├── docker-compose/              # stessa cartella, stesso nome, dei nodi reali (es. /opt/docker-compose
 │   │                            # su pve-management) — tracciata direttamente, non una copia separata
 │   │                            # (ADR-008). Servizi reali oggi: 1password-connect, infisical,
-│   │                            # linkwarden, monitoring, traefik, hawser, Semaphore, renovate, paca, karakeep.
+│   │                            # linkwarden, monitoring, traefik, hawser, Semaphore, renovate, paca, karakeep, openmausbot.
 │   ├── traefik/
 │   ├── adguard/                # non ancora versionato (Region A)
 │   │   ├── keepalived/
@@ -108,6 +109,7 @@ homelab/
 - **ADR-009** — PACA su LXC dedicata (`Paca-120`), per isolare il rischio `docker.sock` di `agent-runner`
 - **ADR-010** — Persistenza dei dati fuori dalla LXC, dopo la perdita dei dati di produzione di PACA (14-17/09/2026): leggere prima di toccare `variables.tf`/`main.tf` di una LXC con dati
 - **ADR-011** — `Minder-130`, LXC dedicata per il runner di staging di project_minder, esposta via Cloudflare Tunnel
+- **ADR-012** — OpenMausBot su LXC dedicata `Maus-117` chiusa dal firewall Proxmox
 
 ## ADR ancora da scrivere (menzionati nel README come placeholder)
 
