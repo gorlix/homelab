@@ -72,9 +72,10 @@ services:
       - TMA_API_KEY=${TMA_API_KEY:?TMA_API_KEY mancante nel .env generato da Infisical}
       - TRAEFIK_API_URL=http://traefik:8080
       - CONFIG_PATH=/app/config
-      # Non root: deve solo leggere dynamic/ (0644) e scrivere i propri backup.
-      - PUID=1000
-      - PGID=1000
+      # Niente PUID/PGID: con un utente non root l'entrypoint esige /app/config
+      # scrivibile e si rifiuta di partire con il mount :ro (verificato il
+      # 16/10/2026, crash loop). Gira quindi come root nel container, ma :ro
+      # blocca la scrittura anche a root e l'agent non ha docker.sock.
     volumes:
       - ./dynamic:/app/config:ro
       - tma_backups:/app/backups
