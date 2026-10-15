@@ -1,0 +1,160 @@
+# OpenMausBot (github.com/milind-soni/OpenMausBot), vedi ADR-012.
+#
+# Gira su Maus-117 (192.168.10.117), LXC dedicata e chiusa dal firewall
+# Proxmox (infrastructure/opentofu/nodes/dell-emc/firewall.tf). Esposto da
+# Traefik-110 come maus.alessandrogorla.it (route statica in
+# traefik/dynamic/dynamic.yml), tunnel Cloudflare `Gorla`.
+#
+# Nessun .env e nessuna cartella Infisical: le variabili qui sotto non sono
+# segreti. I segreti veri (login degli engine, chiavi API inserite dalla UI,
+# sessioni di pairing) li scrive il server nel volume `data` a runtime.
+services:
+  omb:
+    # Immagine costruita in locale dal Dockerfile accanto: quella upstream non
+    # contiene le CLI degli engine. pull_policy build: senza, un `docker
+    # compose up -d` (ruolo docker_service) troverebbe già un'immagine con
+    # questo nome e non ricostruirebbe dopo un bump del FROM. Con la cache dei
+    # layer, una build senza modifiche dura pochi secondi.
+    build: .
+    image: openmausbot-local
+    pull_policy: build
+    restart: unless-stopped
+    # init raccoglie i processi Chrome terminati dei bot, shm_size serve a
+    # Chrome: entrambi richiesti upstream (docs/browser-packaging.md).
+    init: true
+    shm_size: 512m
+    volumes:
+      # HOME dell'utente maus: stato del server (~/.openmausbot, SQLite),
+      # login degli engine (~/.claude, ~/.codex), sessioni del browser.
+      # Volume nominato, non bind: eredita i permessi di maus dall'immagine.
+      - data:/data
+    ports:
+      # Porta di Caddy (che condivide questo network namespace), sull'IP della
+      # LXC perché Traefik-110 la deve raggiungere. Il firewall Proxmox la apre
+      # solo a 192.168.10.110. Il server stesso (8799/8800) resta su loopback.
+      - "192.168.10.117:8080:80"
+    environment:
+      OMB_PORT: "8799"
+      OMB_WEBHOOK_PORT: "8800"
+      OMB_PUBLIC_URL: https://maus.alessandrogorla.it
+      OMB_WEBHOOK_PUBLIC_URL: https://maus.alessandrogorla.it
+    # Il server gira come maus (non root) e non gli serve nessuna capability:
+    # Chrome parte già con --no-sandbox dentro un container (lo decide
+    # agent-browser). Se un aggiornamento dovesse romperlo, il primo
+    # sospettato è cap_drop: verificare con `docker compose logs omb`.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # Tetti per non far soffocare la LXC a un bot che apre troppi browser:
+    # lasciano spazio a Docker, Caddy e al backup dentro i 4 GB della LXC.
+    mem_limit: 3g
+    pids_limit: 1024
+    # Nessun /var/run/docker.sock e nessun mount di /opt: una shell di un bot
+    # resta dentro questo container.
+
+  # Condivide il network namespace di omb: se omb viene ricreato, va ricreato
+  # anche caddy. `docker compose up -d` dell'intero stack lo fa da solo; dopo
+  # un `up -d omb` o `restart omb` manuale, rilanciare anche caddy.
+  caddy:
+    image: caddy:2.10.2
+    restart: unless-stopped
+    network_mode: service:omb
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      omb:
+        condition: service_healthy
+
+  # Backup notturno del volume data verso /mnt/persistent-backups, bind mount
+  # della LXC su una directory di `pve` (backup_host_path in variables.tf,
+  # ADR-010). Stesso schema di karakeep: `.backup` di SQLite per ogni database
+  # della HOME (copia coerente anche a server acceso), verificata con
+  # quick_check, più il resto della HOME in tar.
+  #
+  # Best-effort: upstream consiglia di fermare il server prima del backup, ma
+  # fermarlo da qui richiederebbe il socket Docker in questo container, cioè
+  # proprio quello che la LXC dedicata vuole evitare. I file non-SQLite
+  # (config.json, login degli engine) possono finire a metà scrittura.
+  #
+  # ATTENZIONE: gli archivi contengono i token OAuth degli engine e le chiavi
+  # API. La directory su pve va messa a chmod 700 a mano (ADR-012).
+  # Restore: fermare omb, svuotare il volume, estrarre l'archivio in /data con
+  # proprietario maus, riavviare.
+  backup:
+    image: alpine:3.24
+    restart: unless-stopped
+    environment:
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+      BACKUP_CRON: ${BACKUP_CRON:-30 3 * * *}
+      TZ: ${TZ:-Europe/Rome}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        apk add --no-cache sqlite tzdata >/dev/null
+        # crond non passa l'environment del container ai job: va su file.
+        echo "BACKUP_RETENTION_DAYS=$$BACKUP_RETENTION_DAYS" > /etc/backup.env
+        cat > /usr/local/bin/run-backup.sh <<'EOS'
+        #!/bin/sh
+        set -e -o pipefail
+        . /etc/backup.env
+        ts="$$(date +%Y%m%d-%H%M%S)"
+        stage="/tmp/openmausbot-$${ts}"
+        tmp="/backups/.openmausbot-$${ts}.tar.gz.tmp"
+        out="/backups/openmausbot-$${ts}.tar.gz"
+        mkdir -p "$$stage/sqlite"
+        ok=1
+        # Ogni database SQLite della HOME (stato del server, ma anche quelli
+        # degli engine, es. ~/.codex), con il suo path relativo a /data: la
+        # struttura interna cambia tra le versioni.
+        for db in $$(find /data -type f \( -name '*.db' -o -name '*.sqlite' \) 2>/dev/null); do
+          rel="$${db#/data/}"
+          mkdir -p "$$stage/sqlite/$$(dirname "$$rel")"
+          if ! sqlite3 "$$db" ".backup '$$stage/sqlite/$$rel'" \
+            || [ "$$(sqlite3 "$$stage/sqlite/$$rel" 'PRAGMA quick_check;')" != "ok" ]; then
+            echo "Backup failed on $$rel" >&2
+            ok=0
+          fi
+        done
+        # Il resto della HOME, senza i file SQLite live (già copiati sopra) e
+        # senza cache ricostruibili.
+        if [ "$$ok" = 1 ] \
+          && tar -czf "$$stage/home.tar.gz" -C /data \
+               --exclude='*.db' --exclude='*.sqlite' \
+               --exclude='*-wal' --exclude='*-shm' \
+               --exclude='.cache' --exclude='.npm' . \
+          && tar -czf "$$tmp" -C "$$stage" .; then
+          mv "$$tmp" "$$out"
+          echo "Backup written: $$out"
+          find /backups -maxdepth 1 -name 'openmausbot-*.tar.gz' -mtime "+$${BACKUP_RETENTION_DAYS}" -delete
+        else
+          echo "Backup failed at $${ts}" >&2
+          rm -f "$$tmp"
+        fi
+        rm -rf "$$stage"
+        EOS
+        chmod +x /usr/local/bin/run-backup.sh
+        mkdir -p /var/spool/cron/crontabs
+        echo "$$BACKUP_CRON /usr/local/bin/run-backup.sh >>/proc/1/fd/1 2>>/proc/1/fd/2" > /var/spool/cron/crontabs/root
+        echo "OpenMausBot backup service started — schedule: $$BACKUP_CRON $$TZ (retention: $$BACKUP_RETENTION_DAYS days)."
+        exec crond -f -d 8
+    volumes:
+      # rw, non ro: `.backup` deve poter prendere i lock (file -shm della WAL).
+      - data:/data
+      - ${BACKUP_DIR:-/mnt/persistent-backups}:/backups
+    depends_on:
+      - omb
+
+volumes:
+  data:
+  caddy_data:
+  caddy_config:

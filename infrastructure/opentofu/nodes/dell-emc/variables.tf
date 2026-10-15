@@ -80,6 +80,10 @@ variable "containers" {
     # con solo `features.nesting` non ha di default. Gestito con un local-exec
     # dedicato in main.tf (stesso schema del blocco backup_host_path sopra).
     tun_device = optional(bool, false)
+    # true per i container che vanno chiusi dal firewall Proxmox (regole in
+    # firewall.tf): attiva `firewall=1` sull'interfaccia net0. Default false:
+    # le LXC esistenti restano come sono, nessun diff nel plan.
+    firewall = optional(bool, false)
   }))
   description = "Mappa dei container LXC da creare su Proxmox"
   default = {
@@ -192,6 +196,25 @@ variable "containers" {
       memory    = 4096
       disk_size = 30
       services  = ["gitlab-runner"]
+    }
+
+    # LXC dedicata a OpenMausBot (ADR-012): i bot hanno una shell reale con i
+    # privilegi dell'utente del server, quindi niente dati né altri servizi qui,
+    # come Paca-120/Minder-130. In più il firewall Proxmox (firewall.tf) la
+    # chiude verso la LAN: entra solo Traefik-110 sulla 8080 e Ansible da
+    # pve-management, esce solo verso Internet. 117 è il primo vmid libero,
+    # verificato con `pvesh get /cluster/resources --type vm` il 15/10/2026
+    # (115 è la VM Kasm, 116 un'altra unità, entrambe fuori da questo file).
+    "Maus-117" = {
+      vmid             = 117
+      ip               = "192.168.10.117/24"
+      gateway          = "192.168.10.254"
+      cores            = 2
+      memory           = 4096
+      disk_size        = 30
+      services         = ["openmausbot"]
+      backup_host_path = "/var/lib/pve-persistent/openmausbot-backups"
+      firewall         = true
     }
 
     # Per aggiungere macchine future basterà inserire qui nuovi blocchi, ad esempio:

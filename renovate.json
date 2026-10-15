@@ -4,6 +4,7 @@
   "timezone": "Europe/Rome",
   "schedule": ["before 6am on monday"],
   "minimumReleaseAge": "3 days",
+  "ignoreDeps": ["openmausbot-local"],
   "packageRules": [
     {
       "description": "Automerge di default per minor/patch (i major restano esclusi dalle regole più sotto). Nessuna CI in questo repo (vedi roadmap in CLAUDE.md) quindi ignoreTests: true — senza, Renovate aspetterebbe indefinitamente dei check che non esistono. minimumReleaseAge sopra dà comunque un margine di 3 giorni prima che un aggiornamento venga anche solo proposto, unica rete di sicurezza in assenza di test automatici.",
@@ -31,6 +32,21 @@
       "matchPackageNames": ["bpg/proxmox"],
       "automerge": false,
       "dependencyDashboardApproval": true
+    },
+    {
+      "description": "OpenMausBot è pre-1.0 e rilascia più volte al giorno: con 0.1.x ogni bump conterebbe come patch e finirebbe in automerge. In più l'immagine viene ricostruita in locale con le CLI degli engine (Dockerfile in docker-compose/openmausbot/) e il volume /data contiene stato e login: niente automerge, approvazione esplicita dalla Dependency Dashboard e almeno 7 giorni di età (ADR-012).",
+      "matchPackageNames": ["ghcr.io/milind-soni/openmausbot", "@anthropic-ai/claude-code", "@openai/codex"],
+      "automerge": false,
+      "dependencyDashboardApproval": true,
+      "minimumReleaseAge": "7 days"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Pin npm delle CLI degli engine nel Dockerfile locale di OpenMausBot (ARG con commento renovate sopra).",
+      "managerFilePatterns": ["docker-compose/openmausbot/Dockerfile"],
+      "matchStrings": ["# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+ARG \\S+=(?<currentValue>\\S+)"]
     }
   ]
 }

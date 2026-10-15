@@ -59,8 +59,9 @@ resource "proxmox_virtual_environment_container" "rocky_targets" {
   }
 
   network_interface {
-    name   = "eth0"
-    bridge = "vmbr0"
+    name     = "eth0"
+    bridge   = "vmbr0"
+    firewall = each.value.firewall
   }
 
   # I bind mount (mp0 di backup_host_path) li crea `pct set` via SSH, non
@@ -177,9 +178,13 @@ EOT
 # AUTOMAZIONE FINALE: trigger automatico di Ansible in sequenza, non appena i
 # container sono su e l'inventory è stato rigenerato.
 resource "terraform_data" "run_ansible" {
+  # Le regole firewall prima di Ansible: con il firewall di Maus-117 attivo e
+  # le regole non ancora scritte, l'SSH da pve-management cadrebbe nel DROP.
   depends_on = [
     proxmox_virtual_environment_container.rocky_targets,
-    local_file.ansible_inventory
+    local_file.ansible_inventory,
+    proxmox_virtual_environment_firewall_options.maus,
+    proxmox_virtual_environment_firewall_rules.maus
   ]
 
   triggers_replace = [

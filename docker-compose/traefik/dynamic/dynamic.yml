@@ -35,6 +35,15 @@ http:
         - web
       service: karakeep
 
+    # Niente middleware Authentik forward-auth su questa route: romperebbe
+    # pairing, stream SSE, app iOS e webhook. L'autenticazione è il pairing
+    # del server stesso (vedi ADR-012).
+    openmausbot:
+      rule: "Host(`maus.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: openmausbot
+
   services:
     # Infisical e 1Password Connect girano su pve-management (192.168.10.200), un
     # host diverso da quello di Traefik (192.168.10.110): niente docker provider/
@@ -69,3 +78,12 @@ http:
       loadBalancer:
         servers:
           - url: "http://192.168.10.100:3020"
+
+    # 8080 è il Caddy sidecar di Maus-117, non il server (8799 resta su
+    # loopback). flushInterval -1 per non bufferizzare lo stream SSE della chat.
+    openmausbot:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.117:8080"
+        responseForwarding:
+          flushInterval: "-1"

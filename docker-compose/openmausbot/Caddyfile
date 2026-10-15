@@ -1,0 +1,33 @@
+# Caddy sidecar nello stesso network namespace del server (network_mode:
+# service:omb), unico punto raggiungibile da fuori del container.
+#
+# Perché non il Caddyfile upstream (deploy/local/Caddyfile): imposta
+# X-Forwarded-Proto allo schema "a monte", che è http a meno di usare
+# OMB_HTTPS_HOST, e OMB_HTTPS_HOST richiede che la porta sia legata a
+# 127.0.0.1. Dietro Traefik-110 la porta deve essere sull'IP della LXC, quindi
+# il server crederebbe di essere su http: niente cookie Secure, controllo
+# same-origin fallito. Qui l'HTTPS lo termina Cloudflare, e l'unica strada per
+# arrivare su questa porta è il tunnel -> Traefik (firewall.tf), quindi https
+# è sempre vero.
+#
+# Il server (8799) si fida di chi arriva da loopback come owner, senza pairing.
+# Caddy aggiunge sempre X-Forwarded-For, ed è questo che fa trattare ogni
+# richiesta come remota (sessione paired obbligatoria): Traefik non deve mai
+# puntare direttamente a 8799.
+:80 {
+	encode zstd gzip
+
+	# Webhook in ingresso per i bot. Stesso hostname pubblico della UI
+	# (OMB_WEBHOOK_PUBLIC_URL nel compose).
+	handle /hooks/* {
+		reverse_proxy 127.0.0.1:8800
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:8799 {
+			header_up X-Forwarded-Proto https
+			# Nessun buffering: la chat è uno stream SSE.
+			flush_interval -1
+		}
+	}
+}
