@@ -57,7 +57,7 @@ services:
   # anche caddy. `docker compose up -d` dell'intero stack lo fa da solo; dopo
   # un `up -d omb` o `restart omb` manuale, rilanciare anche caddy.
   caddy:
-    image: caddy:2.10.2
+    image: caddy:2.11.7
     restart: unless-stopped
     network_mode: service:omb
     cap_drop:
