@@ -124,7 +124,7 @@ homelab/
 
 **Regola d'oro per ogni file pubblicato (config, non solo doc):** prima di ogni commit, l'autore deve poter spiegare il file riga per riga senza guardarlo. Claude Code non deve generare configurazioni che l'utente non ha revisionato e compreso — se propone una configurazione complessa, deve accompagnarla con una spiegazione chiara del *perché*, non solo del *cosa*.
 
-**Tracking del lavoro:** bug, decisioni, fix e piani approvati si tracciano sul progetto PACA "Home" (prefisso `HOME`) seguendo la skill di repo `.claude/skills/paca-workflow/SKILL.md`, che contiene ID di stati, tipi ed epic, priorità e regole per i subagent. Server MCP da usare: `paca-homelab` (scope local, fuori dal repo), non `paca`.
+**Tracking del lavoro:** bug, decisioni, fix e piani approvati si tracciano sul progetto PACA "Homelab" (prefisso `HOME`) seguendo la skill di repo `.claude/skills/paca-workflow/SKILL.md`, che contiene ID di stati, tipi ed epic, priorità e regole per i subagent. Server MCP da usare: `paca-homelab` (scope local, fuori dal repo), non `paca`.
 
 **Segreti:** nessun valore in chiaro nel repo. Solo riferimenti `op://vault/item/field` risolti a runtime con 1Password CLI/Connect, o segreti applicativi su Infisical (ADR-007). Gitleaks come pre-commit hook (repo locale e checkout su `pve-management`) è rete di sicurezza aggiuntiva, non la difesa primaria — CI su GitHub ancora da impostare. Attenzione anche a segreti "impliciti": IP pubblici, MAC address, coordinate GPS in config Home Assistant, serial number nei log — vanno sanitizzati a mano. Anche identificativi non tecnicamente segreti ma specifici di una risorsa reale (es. un id di vault) vanno evitati come default hardcoded in script versionati — vedi ADR-006.
 

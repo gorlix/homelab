@@ -1,6 +1,6 @@
 ---
 name: paca-workflow
-description: Come tracciare il lavoro su PACA per il repo homelab (progetto PACA "Home", prefisso HOME) — ID stabili, priorità, stati, epic, sottotask, branch/PR e piani approvati → epic.
+description: Come tracciare il lavoro su PACA per il repo homelab (progetto PACA "Homelab", prefisso HOME) — ID stabili, priorità, stati, epic, sottotask, branch/PR e piani approvati → epic.
 when_to_use: Usala proattivamente ogni volta che in questo repo si trova un bug, si prende una decisione, si implementa un fix, si apre un branch/PR, o si approva un piano con ExitPlanMode — non solo quando l'utente nomina PACA. Anche per "aggiorna le task", "è aggiornato PACA?", "che priorità ha X".
 ---
 
@@ -14,7 +14,7 @@ diverge dal comportamento reale dei tool, vince il tool (e aggiorna questa skill
 ## 1. MCP
 
 Per questo repo i tool sono `mcp__paca-homelab__*`: server `paca-homelab` a scope
-**local** del repo (in `~/.claude.json`, mai nel repo), legato al progetto Home con
+**local** del repo (in `~/.claude.json`, mai nel repo), legato al progetto Homelab con
 `PACA_PROJECT_ID`. Il server `paca` a scope user è legato a Trimind: non usarlo
 per Home, risponde "single-project agent mode".
 
@@ -29,7 +29,7 @@ per Home, risponde "single-project agent mode".
 
 ## 2. ID stabili (verificati 2026-10-19)
 
-Progetto **Home**: `cd2189af-87bb-45c1-8272-03a82b5f16ce` · prefisso task `HOME`
+Progetto **Homelab**: `cd2189af-87bb-45c1-8272-03a82b5f16ce` · prefisso task `HOME`
 · repo `gorlix/homelab` collegato (branch `main`, webhook attivo).
 
 **Tipi**
@@ -188,7 +188,7 @@ regole + gli ID di §2 necessari.
   Trimind con `PACA_PROJECT_ID`; per questo `create_project` e ogni chiamata su
   Home davano errore. Soluzione: server `paca-homelab` a scope local con un
   agent dedicato a Home, aggiunto dalla pagina Agents del progetto.
-- Il nome del progetto su PACA è "Home" (non "Homelab"); il prefisso è `HOME`.
+- Il nome del progetto su PACA era "Home" al bootstrap; rinominato in "Homelab" il 2026-10-19. Il prefisso resta `HOME` e l'ID non cambia.
 - Il task HOME-7 ("Bootstrap skill PACA") traccia la creazione di questa skill.
 
 (Aggiungi qui ogni nuova lezione specifica, con data. Le lezioni valide per
