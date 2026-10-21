@@ -9,16 +9,16 @@
 #
 # Il tag di FROM lo aggiorna Renovate (manager dockerfile, regola senza
 # automerge in renovate.json: pre-1.0, rilasci quotidiani).
-FROM ghcr.io/milind-soni/openmausbot:v0.1.111
+FROM ghcr.io/milind-soni/openmausbot:v0.1.120
 
 USER root
 
 # renovate: datasource=npm depName=@anthropic-ai/claude-code
-ARG CLAUDE_CODE_VERSION=2.1.300
+ARG CLAUDE_CODE_VERSION=2.1.306
 # renovate: datasource=npm depName=@openai/codex
-ARG CODEX_VERSION=0.162.1
+ARG CODEX_VERSION=0.163.0
 # renovate: datasource=npm depName=opencode-ai
-ARG OPENCODE_VERSION=1.19.0
+ARG OPENCODE_VERSION=1.19.3
 
 # HOME temporanea: le cache npm della build non devono finire nell'immagine
 # né, soprattutto, nel volume /data (che è la HOME di maus a runtime).
@@ -35,7 +35,7 @@ RUN HOME=/tmp/omb-build-home npm install -g \
 # che il driver di OpenMausBot cerca (docs/cursor.md upstream).
 # Non è su npm: Renovate non lo vede, la versione si aggiorna a mano leggendo
 # DOWNLOAD_URL in https://cursor.com/install.
-ARG CURSOR_AGENT_VERSION=2026.10.14-941492e
+ARG CURSOR_AGENT_VERSION=2026.10.19-6bbf2c4
 RUN mkdir -p /opt/cursor-agent \
   && curl -fsSL "https://downloads.cursor.com/lab/${CURSOR_AGENT_VERSION}/linux/x64/agent-cli-package.tar.gz" \
      | tar --strip-components=1 -xzf - -C /opt/cursor-agent \
