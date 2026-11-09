@@ -206,7 +206,7 @@ services:
 
   # Realtime (Socket.IO)
   realtime:
-    image: ${PACA_REALTIME_IMAGE:-pacaai/paca-realtime:0.19.2}
+    image: ${PACA_REALTIME_IMAGE:-pacaai/paca-realtime:0.20.1}
     restart: unless-stopped
     environment:
       PORT: 3001
