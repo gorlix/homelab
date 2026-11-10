@@ -44,6 +44,7 @@ Tutti e 3 su **Proxmox VE**.
 - PACA (project management AI-native) — su LXC dedicata `Paca-120`, isolata da `Docker-100` per il rischio `docker.sock` di `agent-runner` (vedi ADR-009)
 - Runner GitHub Actions self-hosted + staging di `project_minder` — su LXC dedicata `Minder-130`, stesso schema di isolamento di `Paca-120`; unità creata ma runner e stack non ancora installati (vedi ADR-011)
 - OpenMausBot (harness self-hosted che fa girare agenti AI come bot in una chat, con shell reale) — su LXC dedicata `Maus-117` (`192.168.10.117`), pubblico come `maus.alessandrogorla.it` via Cloudflare Tunnel `Gorla` → Traefik-110 → `192.168.10.117:8080` (Caddy), auth = pairing del server (niente Authentik forward-auth); prima unità chiusa dal firewall Proxmox (`firewall.tf`: ingresso solo da Traefik-110 e SSH da `pve-management`, niente reti private in uscita, richiede firewall datacenter attivo), backup notturno best-effort su `pve` fuori dalla LXC (stessi limiti di PACA/Karakeep: non 3-2-1, contiene token degli engine), niente automerge Renovate (pre-1.0) (vedi ADR-012)
+- Rakazo (bot in chat con un "computer" Docker per bot: desktop + Chromium guidati dall'agente) — su LXC dedicata `Rakazo-118` (`192.168.10.118`), disco su `Storage` (LVM thick) e non sul thin pool, pubblico come `rakazo.alessandrogorla.it` via Cloudflare Tunnel `Gorla` → Traefik-110 → `192.168.10.118:5173`, stesso firewall Proxmox di `Maus-117`, egress dei computer `restricted`, signup chiuso (account con `bootstrap-owner`), segreti su Infisical `prod/rakazo` (`ENCRYPTION_KEY` anche su 1Password), backup notturno su `pve` (non 3-2-1), niente automerge Renovate (pre-1.0) (vedi ADR-013)
 - Nodi Kubernetes (work in progress)
 - Traefik (reverse proxy della Region B)
 - Cloudflare Tunnel (ad-hoc per la Region B)
@@ -83,7 +84,7 @@ homelab/
 ├── docker-compose/              # stessa cartella, stesso nome, dei nodi reali (es. /opt/docker-compose
 │   │                            # su pve-management) — tracciata direttamente, non una copia separata
 │   │                            # (ADR-008). Servizi reali oggi: 1password-connect, infisical,
-│   │                            # linkwarden, monitoring, traefik, hawser, Semaphore, renovate, paca, karakeep, openmausbot.
+│   │                            # linkwarden, monitoring, traefik, hawser, Semaphore, renovate, paca, karakeep, openmausbot, rakazo.
 │   ├── traefik/
 │   ├── adguard/                # non ancora versionato (Region A)
 │   │   ├── keepalived/
@@ -110,6 +111,7 @@ homelab/
 - **ADR-010** — Persistenza dei dati fuori dalla LXC, dopo la perdita dei dati di produzione di PACA (14-17/09/2026): leggere prima di toccare `variables.tf`/`main.tf` di una LXC con dati
 - **ADR-011** — `Minder-130`, LXC dedicata per il runner di staging di project_minder, esposta via Cloudflare Tunnel
 - **ADR-012** — OpenMausBot su LXC dedicata `Maus-117` chiusa dal firewall Proxmox
+- **ADR-013** — Rakazo su LXC dedicata `Rakazo-118`, disco fuori dal thin pool, firewall condiviso con `Maus-117`
 
 ## ADR ancora da scrivere (menzionati nel README come placeholder)
 

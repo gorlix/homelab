@@ -44,6 +44,15 @@ http:
         - web
       service: openmausbot
 
+    # Niente forward-auth Authentik: Rakazo ha i propri account (signup chiuso,
+    # account creati con bootstrap-owner) e il pannello del computer usa
+    # websocket e capability firmate. Vedi ADR-013.
+    rakazo:
+      rule: "Host(`rakazo.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: rakazo
+
     authentik:
       rule: "Host(`auth.alessandrogorla.it`)"
       entryPoints:
@@ -99,6 +108,16 @@ http:
       loadBalancer:
         servers:
           - url: "http://192.168.10.117:8080"
+        responseForwarding:
+          flushInterval: "-1"
+
+    # 5173 è il web di Rakazo-118 (vite preview), che fa da proxy verso l'API
+    # (3100 resta su loopback). flushInterval -1 per non bufferizzare gli
+    # stream della chat.
+    rakazo:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.118:5173"
         responseForwarding:
           flushInterval: "-1"
 

@@ -84,6 +84,9 @@ variable "containers" {
     # firewall.tf): attiva `firewall=1` sull'interfaccia net0. Default false:
     # le LXC esistenti restano come sono, nessun diff nel plan.
     firewall = optional(bool, false)
+    # Storage Proxmox del disco root. Default local-lvm (thin pool) per non
+    # cambiare le LXC esistenti: cambiarlo su una LXC già creata la ricrea.
+    datastore = optional(string, "local-lvm")
   }))
   description = "Mappa dei container LXC da creare su Proxmox"
   default = {
@@ -190,10 +193,11 @@ variable "containers" {
       vmid      = 114
       ip        = "192.168.10.114/24"
       gateway   = "192.168.10.254"
-      # 4/4096/30 per i docker build dei job: applicati a mano con pct set /
-      # pct resize l'11/10/2026, qui allineati (plan senza differenze).
-      cores     = 4
-      memory    = 4096
+      # 8/8192 per reggere concurrent = 6 (circa 1 core a job, picco 1,4 GB con
+      # 2 slot, swap 0): applicati con pct set il 02/11/2026. Disco fermo a 30:
+      # picco 18,5 GB, e il thin pool è al 75%.
+      cores     = 8
+      memory    = 8192
       disk_size = 30
       services  = ["gitlab-runner"]
     }
@@ -214,6 +218,25 @@ variable "containers" {
       disk_size        = 30
       services         = ["openmausbot"]
       backup_host_path = "/var/lib/pve-persistent/openmausbot-backups"
+      firewall         = true
+    }
+
+    # LXC dedicata a Rakazo (ADR-013): il supervisor ha docker.sock e avvia per
+    # ogni bot un "computer" (desktop + Chromium) guidato da un agente, quindi
+    # stesso isolamento di Maus-117, firewall compreso. Disco su `Storage`
+    # (LVM thick su sdb1) e non su local-lvm: il thin pool era all'80% il
+    # 10/11/2026 e le immagini e le home dei bot crescono. vmid 118 libero,
+    # verificato via API Proxmox lo stesso giorno.
+    "Rakazo-118" = {
+      vmid             = 118
+      ip               = "192.168.10.118/24"
+      gateway          = "192.168.10.254"
+      cores            = 4
+      memory           = 8192
+      disk_size        = 40
+      datastore        = "Storage"
+      services         = ["rakazo"]
+      backup_host_path = "/var/lib/pve-persistent/rakazo-backups"
       firewall         = true
     }
 
