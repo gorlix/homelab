@@ -39,6 +39,14 @@
       "automerge": false,
       "dependencyDashboardApproval": true,
       "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Rakazo è pre-1.0 e una release può cambiare le variabili del compose (docker-compose/rakazo/ è una copia del file upstream con modifiche marcate homelab:): niente automerge, approvazione esplicita dalla Dependency Dashboard e 7 giorni di età. app e computer vanno aggiornate insieme, stesso tag (ADR-013).",
+      "matchPackageNames": ["ghcr.io/elie222/rakazo/app", "ghcr.io/elie222/rakazo/computer"],
+      "groupName": "rakazo",
+      "automerge": false,
+      "dependencyDashboardApproval": true,
+      "minimumReleaseAge": "7 days"
     }
   ],
   "customManagers": [
@@ -47,6 +55,13 @@
       "description": "Pin npm delle CLI degli engine nel Dockerfile locale di OpenMausBot (ARG con commento renovate sopra).",
       "managerFilePatterns": ["docker-compose/openmausbot/Dockerfile"],
       "matchStrings": ["# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+ARG \\S+=(?<currentValue>\\S+)"]
+    },
+    {
+      "customType": "regex",
+      "description": "Il supervisor di Rakazo riceve l'immagine del computer in RAKAZO_COMPUTER_IMAGE, che il manager docker-compose non legge: senza questo un bump aggiornerebbe solo il servizio computer e il supervisor continuerebbe a usare il tag vecchio.",
+      "managerFilePatterns": ["docker-compose/rakazo/docker-compose.yml"],
+      "matchStrings": ["RAKAZO_COMPUTER_IMAGE: (?<depName>ghcr\\.io/elie222/rakazo/computer):(?<currentValue>\\S+)"],
+      "datasourceTemplate": "docker"
     }
   ]
 }

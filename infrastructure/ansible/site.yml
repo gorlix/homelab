@@ -121,3 +121,14 @@
       loop: "{{ services }}"
       loop_control:
         loop_var: service_name
+
+    # Regole iptables che tengono i computer dei bot di Rakazo fuori da LAN,
+    # host e reti private (ADR-013). Script upstream copiato in
+    # docker-compose/rakazo/ alla stessa versione del compose. Dopo il compose
+    # up perché serve la catena DOCKER-USER, che crea Docker. Idempotente:
+    # riscrive le regole solo se mancano, e installa un'unità systemd che le
+    # rimette a ogni boot.
+    - name: Restringi l'egress dei computer di Rakazo (se questo host esegue Rakazo)
+      ansible.builtin.command: bash /opt/rakazo/restrict-computer-egress.sh
+      changed_when: false
+      when: "'rakazo' in services"

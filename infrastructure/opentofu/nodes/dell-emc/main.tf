@@ -45,7 +45,7 @@ resource "proxmox_virtual_environment_container" "rocky_targets" {
   }
 
   disk {
-    datastore_id = "local-lvm"
+    datastore_id = each.value.datastore
     size         = each.value.disk_size
   }
 
@@ -178,13 +178,13 @@ EOT
 # AUTOMAZIONE FINALE: trigger automatico di Ansible in sequenza, non appena i
 # container sono su e l'inventory è stato rigenerato.
 resource "terraform_data" "run_ansible" {
-  # Le regole firewall prima di Ansible: con il firewall di Maus-117 attivo e
+  # Le regole firewall prima di Ansible: con il firewall di Maus-117/Rakazo-118 attivo e
   # le regole non ancora scritte, l'SSH da pve-management cadrebbe nel DROP.
   depends_on = [
     proxmox_virtual_environment_container.rocky_targets,
     local_file.ansible_inventory,
-    proxmox_virtual_environment_firewall_options.maus,
-    proxmox_virtual_environment_firewall_rules.maus
+    proxmox_virtual_environment_firewall_options.isolated,
+    proxmox_virtual_environment_firewall_rules.isolated
   ]
 
   triggers_replace = [

@@ -1,6 +1,7 @@
-# Firewall Proxmox per Maus-117 (OpenMausBot, ADR-012). Primo uso del firewall
-# Proxmox in questo repo: le altre LXC non ne hanno uno (firewall = false in
-# variables.tf, nessun diff per loro).
+# Firewall Proxmox per le LXC che fanno girare agenti AI con una shell o un
+# computer: Maus-117 (OpenMausBot, ADR-012) e Rakazo-118 (Rakazo, ADR-013).
+# Stesse regole per entrambe, cambia solo la porta su cui entra Traefik-110.
+# Le altre LXC non hanno firewall (firewall = false in variables.tf).
 #
 # PREREQUISITO MANUALE, fuori da Tofu: queste regole valgono solo se il firewall
 # è attivo anche a livello datacenter (/etc/pve/firewall/cluster.fw con
@@ -13,15 +14,37 @@
 # privilegi dell'utente del server. Una LXC dedicata isola i dati, non la rete:
 # da dentro Maus-117 una shell raggiungerebbe comunque ogni servizio della LAN
 # (Docker-100, pve-management, la rete aziendale dietro il Cisco, ADR-005).
+# Per Rakazo vale lo stesso per i container dei computer dei bot.
 
-resource "proxmox_virtual_environment_firewall_options" "maus" {
+locals {
+  # LXC isolata => porta su cui Traefik-110 raggiunge il servizio.
+  isolated_containers = {
+    "Maus-117"   = "8080" # Caddy sidecar di OpenMausBot
+    "Rakazo-118" = "5173" # web di Rakazo (vite preview, fa da proxy verso l'API)
+  }
+}
+
+# Indirizzi delle resource cambiati quando sono passate a for_each: i moved
+# dicono a Tofu che sono le stesse, nessuna chiamata API per Maus-117.
+moved {
+  from = proxmox_virtual_environment_firewall_options.maus
+  to   = proxmox_virtual_environment_firewall_options.isolated["Maus-117"]
+}
+
+moved {
+  from = proxmox_virtual_environment_firewall_rules.maus
+  to   = proxmox_virtual_environment_firewall_rules.isolated["Maus-117"]
+}
+
+resource "proxmox_virtual_environment_firewall_options" "isolated" {
+  for_each     = local.isolated_containers
   provider     = proxmox.secure
   # Prima le regole, poi la policy DROP: al contrario ci sarebbe un momento in
   # cui la LXC accetta solo ESTABLISHED e Ansible non entra.
-  depends_on = [proxmox_virtual_environment_firewall_rules.maus]
+  depends_on = [proxmox_virtual_environment_firewall_rules.isolated]
 
   node_name    = "pve"
-  container_id = proxmox_virtual_environment_container.rocky_targets["Maus-117"].vm_id
+  container_id = proxmox_virtual_environment_container.rocky_targets[each.key].vm_id
 
   enabled       = true
   input_policy  = "DROP"
@@ -36,10 +59,11 @@ resource "proxmox_virtual_environment_firewall_options" "maus" {
   ndp       = false
 }
 
-resource "proxmox_virtual_environment_firewall_rules" "maus" {
+resource "proxmox_virtual_environment_firewall_rules" "isolated" {
+  for_each     = local.isolated_containers
   provider     = proxmox.secure
   node_name    = "pve"
-  container_id = proxmox_virtual_environment_container.rocky_targets["Maus-117"].vm_id
+  container_id = proxmox_virtual_environment_container.rocky_targets[each.key].vm_id
 
   # Le regole sono valutate in ordine, la prima che corrisponde vince. Le
   # risposte alle connessioni già accettate (es. l'SSH di Ansible) passano
@@ -48,10 +72,10 @@ resource "proxmox_virtual_environment_firewall_rules" "maus" {
   rule {
     type    = "in"
     action  = "ACCEPT"
-    comment = "Traefik-110 verso il Caddy sidecar di OpenMausBot"
+    comment = each.key == "Maus-117" ? "Traefik-110 verso il Caddy sidecar di OpenMausBot" : "Traefik-110 verso ${each.key}"
     source  = "192.168.10.110"
     proto   = "tcp"
-    dport   = "8080"
+    dport   = each.value
   }
 
   # Ansible gira su pve-management. Nessuna regola per hawser
