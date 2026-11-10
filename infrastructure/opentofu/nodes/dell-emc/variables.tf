@@ -190,10 +190,11 @@ variable "containers" {
       vmid      = 114
       ip        = "192.168.10.114/24"
       gateway   = "192.168.10.254"
-      # 4/4096/30 per i docker build dei job: applicati a mano con pct set /
-      # pct resize l'11/10/2026, qui allineati (plan senza differenze).
-      cores     = 4
-      memory    = 4096
+      # 8/8192 per reggere concurrent = 6 (circa 1 core a job, picco 1,4 GB con
+      # 2 slot, swap 0): applicati con pct set il 02/11/2026. Disco fermo a 30:
+      # picco 18,5 GB, e il thin pool è al 75%.
+      cores     = 8
+      memory    = 8192
       disk_size = 30
       services  = ["gitlab-runner"]
     }
