@@ -77,6 +77,64 @@ services:
     volumes:
       - ./meili_data:/meili_data
 
+  # Server MCP ufficiale di Karakeep (@karakeep/mcp) per i bot di Rakazo,
+  # pubblico come mcp-karakeep.alessandrogorla.it (Traefik-110). Il server
+  # parla solo stdio: mcp-proxy lo lancia come sottoprocesso e lo espone in
+  # streamable-http su /karakeep/mcp, accettando solo richieste con il token
+  # Bearer (in Rakazo: autenticazione "Bearer token").
+  #
+  # Qui e non come server stdio dentro Rakazo: lì il processo girerebbe con
+  # l'accesso di API e worker (password del database, ENCRYPTION_KEY). Qui il
+  # pacchetto npm vede solo la chiave API di Karakeep.
+  #
+  # Segreti su Infisical prod/karakeep: KARAKEEP_MCP_API_KEY (chiave API
+  # creata nelle impostazioni di Karakeep) e KARAKEEP_MCP_AUTH_TOKEN (token
+  # casuale che Rakazo manda come Bearer). Interpolati qui sotto invece di
+  # env_file: così il container non riceve gli altri segreti del .env.
+  mcp:
+    image: ghcr.io/tbxark/mcp-proxy:v1.1.0
+    restart: unless-stopped
+    environment:
+      KARAKEEP_MCP_API_KEY: ${KARAKEEP_MCP_API_KEY:?manca su Infisical prod/karakeep}
+      KARAKEEP_MCP_AUTH_TOKEN: ${KARAKEEP_MCP_AUTH_TOKEN:?manca su Infisical prod/karakeep}
+    # La config la scrivo all'avvio da questi due valori (json.dumps, niente
+    # problemi di escaping) invece di versionarla: conterrebbe i segreti.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        python3 - <<'EOF'
+        import json, os
+        cfg = {
+          "mcpProxy": {
+            "baseURL": "https://mcp-karakeep.alessandrogorla.it",
+            "addr": ":9090",
+            "name": "Karakeep MCP",
+            "version": "1.0.0",
+            "type": "streamable-http",
+            "options": {"authTokens": [os.environ["KARAKEEP_MCP_AUTH_TOKEN"]], "logEnabled": True},
+          },
+          "mcpServers": {
+            "karakeep": {
+              # Versione fissata: npx scarica sempre questa, Renovate non la vede.
+              "command": "npx",
+              "args": ["-y", "@karakeep/mcp@0.34.1"],
+              # Karakeep sulla rete del compose, senza uscire da Docker-100.
+              "env": {"KARAKEEP_API_ADDR": "http://web:3000", "KARAKEEP_API_KEY": os.environ["KARAKEEP_MCP_API_KEY"]},
+              "timeout": "60s",
+            }
+          },
+        }
+        os.umask(0o077)
+        json.dump(cfg, open("/tmp/config.json", "w"))
+        EOF
+        exec /main --config /tmp/config.json
+    ports:
+      # 3020 è il web di Karakeep, 3030-3033 i server MCP Google.
+      - 3021:9090
+    depends_on:
+      - web
+
   # Backup notturno di ./data verso /mnt/persistent-backups, bind mount della
   # LXC su una directory di `pve` (backup_host_path in variables.tf, stesso
   # schema di PACA, vedi ADR-010): sopravvive a un destroy+recreate di

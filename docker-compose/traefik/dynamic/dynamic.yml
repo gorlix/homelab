@@ -78,6 +78,14 @@ http:
         - web
       service: mcp-tasks
 
+    # Server MCP di Karakeep (mcp-proxy nello stack karakeep). Stessa logica
+    # dei server Google: niente forward-auth, chiede un token Bearer.
+    mcp-karakeep:
+      rule: "Host(`mcp-karakeep.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: mcp-karakeep
+
     authentik:
       rule: "Host(`auth.alessandrogorla.it`)"
       entryPoints:
@@ -170,6 +178,13 @@ http:
       loadBalancer:
         servers:
           - url: "http://192.168.10.100:3033"
+        responseForwarding:
+          flushInterval: "-1"
+
+    mcp-karakeep:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.100:3021"
         responseForwarding:
           flushInterval: "-1"
 
