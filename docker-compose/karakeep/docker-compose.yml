@@ -117,8 +117,10 @@ services:
           "mcpServers": {
             "karakeep": {
               # Versione fissata: npx scarica sempre questa, Renovate non la vede.
+              # Allineata alla minor di Karakeep (0.33.x): a ogni bump di Karakeep
+              # va aggiornata a mano, verificando su npm che esista.
               "command": "npx",
-              "args": ["-y", "@karakeep/mcp@0.34.1"],
+              "args": ["-y", "@karakeep/mcp@0.33.1"],
               # Karakeep sulla rete del compose, senza uscire da Docker-100.
               "env": {"KARAKEEP_API_ADDR": "http://web:3000", "KARAKEEP_API_KEY": os.environ["KARAKEEP_MCP_API_KEY"]},
               "timeout": "60s",
