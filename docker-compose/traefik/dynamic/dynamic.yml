@@ -53,14 +53,30 @@ http:
         - web
       service: rakazo
 
-    # Server MCP Google per Rakazo. Niente forward-auth Authentik: le chiamate
-    # arrivano dal server di Rakazo, non da un browser, e il server MCP chiede
-    # già un token OAuth a ogni richiesta (MCP_ENABLE_OAUTH21).
-    google-workspace-mcp:
-      rule: "Host(`mcp-google.alessandrogorla.it`)"
+    # Server MCP Google per Rakazo, uno per servizio. Niente forward-auth
+    # Authentik: le chiamate arrivano dal server di Rakazo, non da un browser,
+    # e i server MCP chiedono già un token OAuth a ogni richiesta
+    # (MCP_ENABLE_OAUTH21).
+    mcp-gmail:
+      rule: "Host(`mcp-gmail.alessandrogorla.it`)"
       entryPoints:
         - web
-      service: google-workspace-mcp
+      service: mcp-gmail
+    mcp-calendar:
+      rule: "Host(`mcp-calendar.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: mcp-calendar
+    mcp-drive:
+      rule: "Host(`mcp-drive.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: mcp-drive
+    mcp-tasks:
+      rule: "Host(`mcp-tasks.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: mcp-tasks
 
     authentik:
       rule: "Host(`auth.alessandrogorla.it`)"
@@ -130,12 +146,30 @@ http:
         responseForwarding:
           flushInterval: "-1"
 
-    # Su Docker-100, porta 3030 (3000/3010/3020 già occupate). flushInterval
-    # -1: streamable-http può rispondere in SSE.
-    google-workspace-mcp:
+    # Server MCP Google su Docker-100, porte 3030-3033 (3000/3010/3020 già
+    # occupate). flushInterval -1: streamable-http può rispondere in SSE.
+    mcp-gmail:
       loadBalancer:
         servers:
           - url: "http://192.168.10.100:3030"
+        responseForwarding:
+          flushInterval: "-1"
+    mcp-calendar:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.100:3031"
+        responseForwarding:
+          flushInterval: "-1"
+    mcp-drive:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.100:3032"
+        responseForwarding:
+          flushInterval: "-1"
+    mcp-tasks:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.100:3033"
         responseForwarding:
           flushInterval: "-1"
 
