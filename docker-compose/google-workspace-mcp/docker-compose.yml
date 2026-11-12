@@ -91,9 +91,10 @@ services:
       <<: *mcp-env
       WORKSPACE_EXTERNAL_URL: https://mcp-drive.alessandrogorla.it
       WORKSPACE_MCP_ALLOWED_HOSTS: mcp-drive.alessandrogorla.it
-      # Sola lettura: cerca, legge e scarica. Per caricare o modificare file:
-      # drive:full, poi va rifatto il Connect degli account (scope nuovi).
-      WORKSPACE_MCP_PERMISSIONS: drive:readonly
+      # Completo: il bot del Drive carica, sposta e organizza i file (visto
+      # nell'uso reale via Composio), in sola lettura non potrebbe. Cambiare
+      # livello cambia gli scope: va rifatto il Connect degli account.
+      WORKSPACE_MCP_PERMISSIONS: drive:full
     volumes:
       - drive_creds:/app/store_creds
     ports:
