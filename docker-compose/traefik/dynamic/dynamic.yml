@@ -53,6 +53,15 @@ http:
         - web
       service: rakazo
 
+    # Server MCP Google per Rakazo. Niente forward-auth Authentik: le chiamate
+    # arrivano dal server di Rakazo, non da un browser, e il server MCP chiede
+    # già un token OAuth a ogni richiesta (MCP_ENABLE_OAUTH21).
+    google-workspace-mcp:
+      rule: "Host(`mcp-google.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: google-workspace-mcp
+
     authentik:
       rule: "Host(`auth.alessandrogorla.it`)"
       entryPoints:
@@ -118,6 +127,15 @@ http:
       loadBalancer:
         servers:
           - url: "http://192.168.10.118:5173"
+        responseForwarding:
+          flushInterval: "-1"
+
+    # Su Docker-100, porta 3030 (3000/3010/3020 già occupate). flushInterval
+    # -1: streamable-http può rispondere in SSE.
+    google-workspace-mcp:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.100:3030"
         responseForwarding:
           flushInterval: "-1"
 

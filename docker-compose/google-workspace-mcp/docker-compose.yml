@@ -1,0 +1,63 @@
+# Server MCP Google Workspace (taylorwilsdon/google_workspace_mcp) per Rakazo:
+# Gmail e Calendar di più account Google da un solo servizio.
+#
+# .env non presente qui: GOOGLE_OAUTH_CLIENT_ID e GOOGLE_OAUTH_CLIENT_SECRET
+# stanno su Infisical in prod/google-workspace-mcp (ADR-007), il .env lo genera
+# Ansible al deploy.
+#
+# Gira su Docker-100, non su Rakazo-118: qui dentro ci sono i token di tutte
+# le caselle, e su Rakazo-118 girano i computer dei bot con docker.sock nel
+# supervisor (ADR-013). Esposto da Traefik-110 come mcp-google.alessandrogorla.it.
+#
+# Modalità OAuth 2.1, non quella "legacy": nella legacy l'endpoint non chiede
+# nessun login e il bot sceglie la casella passando un indirizzo email in ogni
+# chiamata, quindi qualunque bot leggerebbe qualunque casella. In OAuth 2.1
+# ogni connessione di Rakazo ha il proprio token, legato a un solo account
+# Google, e il server sostituisce l'email passata dal bot con quella del token
+# (auth/service_decorator.py upstream). Una voce MCP in Rakazo per account,
+# assegnata solo ai bot del suo gruppo.
+services:
+  google-workspace-mcp:
+    image: ghcr.io/taylorwilsdon/google_workspace_mcp:2.4.2
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MCP_ENABLE_OAUTH21: "true"
+      # URL pubblico: lo usano i metadati OAuth e il redirect verso Google.
+      # Il redirect da registrare sul client Google è
+      # https://mcp-google.alessandrogorla.it/oauth2callback
+      WORKSPACE_EXTERNAL_URL: https://mcp-google.alessandrogorla.it
+      # In OAuth 2.1 l'immagine ascolta già su 0.0.0.0, lo scrivo per chiarezza.
+      WORKSPACE_MCP_HOST: 0.0.0.0
+      # Rifiuta richieste con un Host diverso (DNS rebinding).
+      WORKSPACE_MCP_ALLOWED_HOSTS: mcp-google.alessandrogorla.it
+      # Chiunque su Internet può fare la registrazione dinamica del client:
+      # con questa allowlist l'unico redirect accettato è quello di Rakazo,
+      # quindi solo Rakazo può completare un login.
+      WORKSPACE_MCP_ALLOWED_CLIENT_REDIRECT_URIS: https://rakazo.alessandrogorla.it/mcp/oauth/callback
+      # Fa scegliere l'account Google a ogni Connect: senza, Google riusa
+      # l'ultimo account del browser e le 8 voci finirebbero sulla stessa casella.
+      WORKSPACE_MCP_OAUTH_PROXY_GOOGLE_PROMPT: select_account consent
+      # Solo Gmail e Calendar (niente Drive, Docs, Sheets: meno tool nel
+      # contesto). Gmail a livello "drafts": legge, organizza e scrive bozze,
+      # ma i tool di invio non ci sono, quindi un'email con istruzioni nascoste
+      # non può far spedire dati fuori. Lo scope OAuth di Google per le bozze
+      # (gmail.compose) permetterebbe comunque l'invio: il limite è nei tool
+      # esposti, non nel token. Per abilitare l'invio: gmail:send.
+      WORKSPACE_MCP_PERMISSIONS: gmail:drafts calendar:full
+      # Token Google e stato del proxy OAuth (client registrati, token emessi a
+      # Rakazo) nello stesso volume: senza, a ogni ricreazione del container
+      # tutte le 8 connessioni andrebbero rifatte.
+      WORKSPACE_MCP_CREDENTIALS_DIR: /app/store_creds/google
+      FASTMCP_HOME: /app/store_creds/fastmcp
+    volumes:
+      # Volume con nome e non bind mount: Docker lo inizializza dalla cartella
+      # dell'immagine, già di proprietà dell'utente app (non root).
+      - store_creds:/app/store_creds
+    ports:
+      # 3000 linkwarden, 3010 monitoring, 3020 karakeep.
+      - 3030:8000
+
+volumes:
+  store_creds:
