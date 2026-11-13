@@ -1,0 +1,99 @@
+# Paperless-ngx su Paperless-119 (192.168.10.119), esposto da Traefik-110 come
+# paperless.alessandrogorla.it (route statica in traefik/dynamic/dynamic.yml).
+# Base: docker/compose/docker-compose.postgres-tika.yml upstream (v3.4.2).
+# Vedi ADR-014.
+#
+# .env non presente in questa cartella: PAPERLESS_SECRET_KEY, PAPERLESS_DBPASS e
+# PAPERLESS_SOCIALACCOUNT_PROVIDERS (JSON con client id e secret del provider
+# Authentik) vivono su Infisical in prod/paperless (ADR-007), il .env viene
+# generato al deploy dal ruolo Ansible infisical_secrets + docker_service.
+#
+# Tutti i dati stanno in /mnt/persistent-data, bind mount (mp1) di un LV
+# dedicato montato su pve: niente volumi Docker sul disco della LXC, tranne
+# Valkey, che contiene solo la coda dei task e si può perdere.
+services:
+  broker:
+    image: docker.io/valkey/valkey:9-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+
+  db:
+    # Senza prefisso docker.io/library: così la regola "immagini stateful" di
+    # renovate.json (matchPackageNames postgres) la riconosce.
+    image: postgres:18
+    restart: unless-stopped
+    volumes:
+      # Postgres 18 vuole il volume su /var/lib/postgresql (non più .../data):
+      # i dati finiscono in 18/docker, e un futuro major va in una cartella
+      # accanto invece di sovrascrivere questa.
+      - /mnt/persistent-data/pgdata:/var/lib/postgresql
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: ${PAPERLESS_DBPASS}
+
+  webserver:
+    # Versione fissata: Renovate propone gli aggiornamenti, senza automerge
+    # (ogni release può portare migrazioni del database).
+    image: ghcr.io/paperless-ngx/paperless-ngx:3.4.2
+    restart: unless-stopped
+    depends_on:
+      - db
+      - broker
+      - gotenberg
+      - tika
+    ports:
+      - "8000:8000"
+    volumes:
+      - /mnt/persistent-data/data:/usr/src/paperless/data
+      - /mnt/persistent-data/media:/usr/src/paperless/media
+      - /mnt/persistent-data/export:/usr/src/paperless/export
+      - /mnt/persistent-data/consume:/usr/src/paperless/consume
+    env_file:
+      - .env
+    environment:
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_DBHOST: db
+      PAPERLESS_DBENGINE: postgresql
+      PAPERLESS_TIKA_ENABLED: 1
+      PAPERLESS_TIKA_GOTENBERG_ENDPOINT: http://gotenberg:3000
+      PAPERLESS_TIKA_ENDPOINT: http://tika:9998
+      PAPERLESS_TIME_ZONE: Europe/Rome
+      # Lingue già presenti nell'immagine (eng, deu, fra, ita, spa): niente
+      # PAPERLESS_OCR_LANGUAGES, che le scaricherebbe a ogni avvio.
+      PAPERLESS_OCR_LANGUAGE: ita+eng
+      # URL pubblico: serve per CSRF/ALLOWED_HOSTS e per i redirect OIDC.
+      PAPERLESS_URL: https://paperless.alessandrogorla.it
+      # Il TLS lo termina Cloudflare e Traefik parla HTTP: senza questo Django
+      # crede di essere su http e il redirect URI verso Authentik non
+      # corrisponde a quello registrato.
+      PAPERLESS_PROXY_SSL_HEADER: '["HTTP_X_FORWARDED_PROTO", "https"]'
+      # Login SSO con Authentik. Il provider sta in
+      # PAPERLESS_SOCIALACCOUNT_PROVIDERS (Infisical). Signup chiusi su tutti e
+      # due i lati: un login Authentik si collega solo a un account locale già
+      # esistente, dal profilo dell'utente (Il mio profilo > Account social).
+      PAPERLESS_APPS: allauth.socialaccount.providers.openid_connect
+      PAPERLESS_ACCOUNT_ALLOW_SIGNUPS: "false"
+      PAPERLESS_SOCIALACCOUNT_ALLOW_SIGNUPS: "false"
+      # Login con password: resta attivo finché l'account admin non è collegato
+      # ad Authentik, poi PAPERLESS_DISABLE_REGULAR_LOGIN=true in Infisical.
+      # Le API con token (app mobile) funzionano comunque.
+      PAPERLESS_DISABLE_REGULAR_LOGIN: ${PAPERLESS_DISABLE_REGULAR_LOGIN:-false}
+
+  gotenberg:
+    image: docker.io/gotenberg/gotenberg:8.38
+    restart: unless-stopped
+    # Upstream: la route chromium serve a convertire le .eml, senza JavaScript
+    # né contenuti esterni (pixel di tracciamento).
+    command:
+      - "gotenberg"
+      - "--chromium-disable-javascript=true"
+      - "--chromium-allow-list=^file:///tmp/.*"
+
+  tika:
+    image: docker.io/apache/tika:3.3.1.0
+    restart: unless-stopped
+
+volumes:
+  redisdata:
