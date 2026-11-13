@@ -75,6 +75,12 @@ variable "containers" {
     # produzione persi perché il backup locale era sullo stesso disco della LXC
     # ricreata). null per i container che non ne hanno bisogno.
     backup_host_path = optional(string, null)
+    # Come backup_host_path, ma per i dati veri del servizio e non per i suoi
+    # backup: montato come mp1 in /mnt/persistent-data. Sul nodo il path deve
+    # essere il mountpoint di un LV dedicato già creato (vedi ADR-014), con la
+    # directory sottostante chattr +i: se l'LV non è montato il servizio fallisce
+    # in scrittura invece di riempire la root di pve. null per tutti gli altri.
+    data_host_path = optional(string, null)
     # true per i container che devono creare un'interfaccia WireGuard (es. client
     # Netbird): serve passthrough di /dev/net/tun, che un container LXC unprivileged
     # con solo `features.nesting` non ha di default. Gestito con un local-exec
@@ -238,6 +244,25 @@ variable "containers" {
       services         = ["rakazo"]
       backup_host_path = "/var/lib/pve-persistent/rakazo-backups"
       firewall         = true
+    }
+
+    # LXC dedicata a Paperless-ngx (ADR-014): documenti personali in
+    # produzione. A differenza di PACA non solo i backup ma tutti i dati
+    # (Postgres, media, consume, export) stanno fuori dalla LXC, su un LV
+    # dedicato del VG Storage montato su pve: un destroy+recreate non li tocca.
+    # Root su Storage per lo stesso motivo di Rakazo-118 (thin pool all'81% il
+    # 13/11/2026). Niente firewall: qui non girano agenti con una shell.
+    # vmid 119 libero, verificato via API Proxmox lo stesso giorno.
+    "Paperless-119" = {
+      vmid           = 119
+      ip             = "192.168.10.119/24"
+      gateway        = "192.168.10.254"
+      cores          = 4
+      memory         = 4096
+      disk_size      = 20
+      datastore      = "Storage"
+      services       = ["paperless"]
+      data_host_path = "/var/lib/pve-persistent/paperless"
     }
 
     # Per aggiungere macchine future basterà inserire qui nuovi blocchi, ad esempio:

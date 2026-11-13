@@ -120,6 +120,27 @@ resource "proxmox_virtual_environment_container" "rocky_targets" {
     EOT
   }
 
+  # Bind mount dei dati (data_host_path in variables.tf) come mp1: stesso
+  # meccanismo e stessi tre dettagli del blocco mp0 qui sopra. Niente chown:
+  # il path è il mountpoint di un LV preparato a mano (ADR-014), già di
+  # 100000:100000; un chown qui toccherebbe la directory immutabile sotto, se
+  # l'LV non fosse montato.
+  provisioner "local-exec" {
+    command = <<-EOT
+      : # no-op quando data_host_path è null (vedi commento sul blocco mp0)
+      %{if each.value.data_host_path != null~}
+      set -e
+      ssh -o StrictHostKeyChecking=no root@192.168.10.199 'mountpoint -q ${each.value.data_host_path} && pct set ${each.value.vmid} -mp1 ${each.value.data_host_path},mp=/mnt/persistent-data && pct reboot ${each.value.vmid}'
+      for i in $(seq 1 40); do
+        if ssh -o StrictHostKeyChecking=no root@192.168.10.199 'pct exec ${each.value.vmid} -- systemctl is-active sshd' >/dev/null 2>&1; then
+          break
+        fi
+        sleep 3
+      done
+      %{endif~}
+    EOT
+  }
+
   # Passthrough di /dev/net/tun per i container che devono creare interfacce
   # WireGuard (vedi tun_device in variables.tf, es. il client Netbird). Un
   # container unprivileged con solo `features.nesting = true` non ha questo

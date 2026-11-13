@@ -86,6 +86,15 @@ http:
         - web
       service: mcp-karakeep
 
+    # Niente forward-auth Authentik: Paperless fa già il login OIDC con
+    # Authentik, e il forward-auth bloccherebbe le API con token dell'app
+    # mobile. Vedi ADR-014.
+    paperless:
+      rule: "Host(`paperless.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: paperless
+
     authentik:
       rule: "Host(`auth.alessandrogorla.it`)"
       entryPoints:
@@ -187,6 +196,11 @@ http:
           - url: "http://192.168.10.100:3021"
         responseForwarding:
           flushInterval: "-1"
+
+    paperless:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.119:8000"
 
     # Authentik gira sulla LXC 111 (192.168.10.111), host diverso da Traefik-110:
     # backend statico. Porta HTTP 9000: il TLS lo termina Cloudflare, lo schema

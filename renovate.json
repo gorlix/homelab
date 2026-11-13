@@ -47,6 +47,11 @@
       "automerge": false,
       "dependencyDashboardApproval": true,
       "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Paperless-ngx: ogni release può portare migrazioni del database dei documenti in produzione (ADR-014). Niente automerge nemmeno per minor/patch: PR da mergiare a mano, dopo aver letto le release notes e controllato che ci sia il backup della notte prima.",
+      "matchPackageNames": ["ghcr.io/paperless-ngx/paperless-ngx"],
+      "automerge": false
     }
   ],
   "customManagers": [
