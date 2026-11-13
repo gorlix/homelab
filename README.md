@@ -131,7 +131,7 @@ flowchart TB
 Ogni sito ha il proprio Cloudflare Tunnel e il proprio Traefik, così i due domini di guasto restano separati: un problema in un sito non tocca l'esposizione dell'altro.
 
 - **Region A — Casa:** `hp-laptop` + `thinkcentre` sono un **cluster Proxmox** sulla stessa LAN. Il tunnel Cloudflare di casa fronta Home Assistant e gli altri servizi locali via Traefik su `hp-laptop`. Nessuna porta esposta sul router di casa.
-- **Region B — Ditta:** `dell-emc` è un nodo **Proxmox standalone** ospitato presso l'azienda di famiglia, su una **VLAN dedicata dietro un firewall Cisco gestito e supervisionato da terzi**. Ha un Cloudflare Tunnel ad-hoc e un Traefik proprio per i servizi di produzione (Authentik, Nextcloud, bot, monitoring, Karakeep, PACA — quest'ultimo su una LXC dedicata, vedi [ADR-009](docs/adr/009-paca.md)) e per lo staging di `project_minder` su un'altra LXC dedicata ([ADR-011](docs/adr/011-minder-130-runner-staging.md)), oltre a OpenMausBot su una terza LXC dedicata chiusa dal firewall Proxmox ([ADR-012](docs/adr/012-openmausbot.md)) e Rakazo su una quarta, con lo stesso firewall e il disco fuori dal thin pool ([ADR-013](docs/adr/013-rakazo.md)).
+- **Region B — Ditta:** `dell-emc` è un nodo **Proxmox standalone** ospitato presso l'azienda di famiglia, su una **VLAN dedicata dietro un firewall Cisco gestito e supervisionato da terzi**. Ha un Cloudflare Tunnel ad-hoc e un Traefik proprio per i servizi di produzione (Authentik, Nextcloud, bot, monitoring, Karakeep, PACA — quest'ultimo su una LXC dedicata, vedi [ADR-009](docs/adr/009-paca.md)) e per lo staging di `project_minder` su un'altra LXC dedicata ([ADR-011](docs/adr/011-minder-130-runner-staging.md)), oltre a OpenMausBot su una terza LXC dedicata chiusa dal firewall Proxmox ([ADR-012](docs/adr/012-openmausbot.md)) e Rakazo su una quarta, con lo stesso firewall e il disco fuori dal thin pool ([ADR-013](docs/adr/013-rakazo.md)) e Paperless-ngx su una quinta, con i dati su un LV dedicato ([ADR-014](docs/adr/014-paperless.md)).
 
 ### Interconnessione tra i siti
 
@@ -192,7 +192,7 @@ homelab/
 │   │                           # dei nodi reali, tracciata direttamente (ADR-008).
 │   │                           # Reali oggi: 1password-connect, infisical, linkwarden,
 │   │                           # monitoring, traefik, hawser, Semaphore, renovate,
-│   │                           # paca, karakeep, openmausbot, rakazo.
+│   │                           # paca, karakeep, openmausbot, rakazo, paperless.
 │   ├── traefik/
 │   ├── adguard/                # non ancora versionato (Region A)
 │   ├── frigate/                # non ancora versionato (Region A)
@@ -234,11 +234,29 @@ Ogni scelta non banale è documentata nel formato *Contesto → Decisione → Co
 - [ADR-011](docs/adr/011-minder-130-runner-staging.md) — `Minder-130`: LXC dedicata per il runner di staging di project_minder, esposta via Cloudflare Tunnel invece che con porte in ingresso
 - [ADR-012](docs/adr/012-openmausbot.md) — OpenMausBot su LXC dedicata `Maus-117` chiusa dal firewall Proxmox
 - [ADR-013](docs/adr/013-rakazo.md) — Rakazo su LXC dedicata `Rakazo-118`, disco fuori dal thin pool
+- [ADR-014](docs/adr/014-paperless.md) — Paperless-ngx su `Paperless-119`, dati su un LV dedicato
 
 Decisioni già prese ma non ancora scritte per esteso (in programmazione):
 
 - ADR-003 — SSO centralizzato con Authentik
 - ADR-004 — Strategia di backup 3-2-1 su S3 Cubbit
+
+## Creare un LV dati dedicato per una LXC
+
+Per le LXC con dati in produzione ([ADR-010](docs/adr/010-persistenza-dati-fuori-dalla-lxc.md), [ADR-014](docs/adr/014-paperless.md)) i dati stanno su un LV del volume group `Storage`, montato su `pve` e passato alla LXC come bind mount. Non lo gestisce OpenTofu: si prepara a mano, una volta, su `pve`.
+
+```bash
+lvcreate -L 100G -n <nome>-data Storage
+mkfs.ext4 /dev/Storage/<nome>-data
+mkdir -p /var/lib/pve-persistent/<nome>
+chattr +i /var/lib/pve-persistent/<nome>     # prima del mount: protegge la directory sotto
+blkid /dev/Storage/<nome>-data               # copiare l'UUID
+echo 'UUID=<uuid> /var/lib/pve-persistent/<nome> ext4 defaults,nofail 0 2' >> /etc/fstab
+mount /var/lib/pve-persistent/<nome>
+chown 100000:100000 /var/lib/pve-persistent/<nome>   # root della LXC unprivileged
+```
+
+Poi `data_host_path = "/var/lib/pve-persistent/<nome>"` nella voce della LXC in `variables.tf`: il provisioner in `main.tf` aggiunge `mp1` solo se `mountpoint -q` passa. `chattr +i` fa sì che, con l'LV non montato, le scritture falliscano invece di finire sulla root di `pve`; `nofail` evita che un LV rotto blocchi il boot del nodo, al prezzo di far partire la LXC senza dati.
 
 ## Secret management
 
