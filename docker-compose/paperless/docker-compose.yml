@@ -130,5 +130,50 @@ services:
     image: docker.io/apache/tika:3.3.1.0
     restart: unless-stopped
 
+  # Server MCP di Paperless (paperless-mcp, tb1337) per Rakazo e Claude Code,
+  # pubblico come mcp-paperless.alessandrogorla.it (Traefik-110, HOME-52). Parla
+  # Streamable HTTP su /mcp e accetta solo richieste con il token Bearer
+  # PAPERLESS_MCP_AUTH_TOKEN. Raggiunge Paperless sulla rete del compose, senza
+  # uscire dalla LXC.
+  #
+  # Segreti su Infisical prod/paperless: PAPERLESS_MCP_TOKEN (token API di
+  # Paperless dell'utente a cui il bot "somiglia": vede e fa quello che può
+  # fare quell'utente, e nei log di Paperless le sue azioni risultano sue) e
+  # PAPERLESS_MCP_AUTH_TOKEN (token casuale che i client mandano come Bearer).
+  # Interpolati qui sotto invece di env_file: il container non riceve gli altri
+  # segreti del .env.
+  #
+  # Cancellazione spenta di default (PAPERLESS_MCP_ENABLE_DELETE): un modello
+  # che decide da solo non deve poter cancellare documenti finché non c'è un
+  # backup verificato (HOME-49). Per accenderla: PAPERLESS_MCP_ENABLE_DELETE=true
+  # su Infisical e nuovo deploy.
+  mcp:
+    # Build locale (mcp.Dockerfile): il tag contiene la versione di
+    # paperless-mcp, da tenere allineata all'ARG del Dockerfile. pull_policy
+    # build, come openmausbot, perché un bump ricostruisca l'immagine.
+    build:
+      context: .
+      dockerfile: mcp.Dockerfile
+    image: paperless-mcp-local:0.1.0
+    pull_policy: build
+    restart: unless-stopped
+    depends_on:
+      - webserver
+    ports:
+      # 8000 è il webserver di Paperless.
+      - "8010:8000"
+    environment:
+      PAPERLESS_URL: http://webserver:8000
+      PAPERLESS_TOKEN: ${PAPERLESS_MCP_TOKEN:?manca su Infisical prod/paperless}
+      PAPERLESS_MCP_AUTH_TOKEN: ${PAPERLESS_MCP_AUTH_TOKEN:?manca su Infisical prod/paperless}
+      PAPERLESS_MCP_HOST: 0.0.0.0
+      PAPERLESS_MCP_READONLY: ${PAPERLESS_MCP_READONLY:-false}
+      PAPERLESS_MCP_ENABLE_DELETE: ${PAPERLESS_MCP_ENABLE_DELETE:-false}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
 volumes:
   redisdata:
