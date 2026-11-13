@@ -59,9 +59,23 @@
       "automerge": false,
       "dependencyDashboardApproval": true,
       "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "paperless-mcp (server MCP di Paperless, HOME-52) è pre-1.0 e 'highly experimental' per sua stessa ammissione: nomi dei tool e parametri cambiano tra una release e l'altra, e un bot li usa in autonomia sui documenti. Niente automerge, approvazione dalla Dependency Dashboard, 7 giorni di età. Il bump va fatto anche nel tag image: del compose, a mano.",
+      "matchPackageNames": ["paperless-mcp"],
+      "matchDatasources": ["pypi"],
+      "automerge": false,
+      "dependencyDashboardApproval": true,
+      "minimumReleaseAge": "7 days"
     }
   ],
   "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Pin PyPI di paperless-mcp nel Dockerfile locale del servizio mcp di Paperless (ARG con commento renovate sopra).",
+      "managerFilePatterns": ["docker-compose/paperless/mcp.Dockerfile"],
+      "matchStrings": ["# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+ARG \\S+=(?<currentValue>\\S+)"]
+    },
     {
       "customType": "regex",
       "description": "Pin npm delle CLI degli engine nel Dockerfile locale di OpenMausBot (ARG con commento renovate sopra).",

@@ -86,6 +86,15 @@ http:
         - web
       service: mcp-karakeep
 
+    # Server MCP di Paperless (servizio mcp nello stack paperless su 119). Niente
+    # forward-auth: chiede un token Bearer, e un login Authentik romperebbe i
+    # client (HOME-52).
+    mcp-paperless:
+      rule: "Host(`mcp-paperless.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: mcp-paperless
+
     # Niente forward-auth Authentik: Paperless fa già il login OIDC con
     # Authentik, e il forward-auth bloccherebbe le API con token dell'app
     # mobile. Vedi ADR-014.
@@ -194,6 +203,13 @@ http:
       loadBalancer:
         servers:
           - url: "http://192.168.10.100:3021"
+        responseForwarding:
+          flushInterval: "-1"
+
+    mcp-paperless:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.119:8010"
         responseForwarding:
           flushInterval: "-1"
 
