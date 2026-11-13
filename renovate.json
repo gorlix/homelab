@@ -52,6 +52,13 @@
       "description": "Paperless-ngx: ogni release può portare migrazioni del database dei documenti in produzione (ADR-014). Niente automerge nemmeno per minor/patch: PR da mergiare a mano, dopo aver letto le release notes e controllato che ci sia il backup della notte prima.",
       "matchPackageNames": ["ghcr.io/paperless-ngx/paperless-ngx"],
       "automerge": false
+    },
+    {
+      "description": "paperless-gpt è pre-1.0 (0.x): ogni release può cambiare le variabili d'ambiente e il servizio scrive sui documenti via API. Niente automerge, approvazione dalla Dependency Dashboard e 7 giorni di età (HOME-48).",
+      "matchPackageNames": ["ghcr.io/icereed/paperless-gpt"],
+      "automerge": false,
+      "dependencyDashboardApproval": true,
+      "minimumReleaseAge": "7 days"
     }
   ],
   "customManagers": [
