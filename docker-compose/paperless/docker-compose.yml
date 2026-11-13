@@ -3,6 +3,10 @@
 # Base: docker/compose/docker-compose.postgres-tika.yml upstream (v3.4.2).
 # Vedi ADR-014.
 #
+# paperless-gpt (HOME-48): suggerisce titolo, tag e corrispondente con l'API
+# Anthropic. Il testo dei documenti esce verso un provider esterno, quindi
+# lavora SOLO sui documenti con il tag "ai-process" (AUTO_TAG).
+#
 # .env non presente in questa cartella: PAPERLESS_SECRET_KEY, PAPERLESS_DBPASS e
 # PAPERLESS_SOCIALACCOUNT_PROVIDERS (JSON con client id e secret del provider
 # Authentik) vivono su Infisical in prod/paperless (ADR-007), il .env viene
@@ -80,6 +84,37 @@ services:
       # ad Authentik, poi PAPERLESS_DISABLE_REGULAR_LOGIN=true in Infisical.
       # Le API con token (app mobile) funzionano comunque.
       PAPERLESS_DISABLE_REGULAR_LOGIN: ${PAPERLESS_DISABLE_REGULAR_LOGIN:-false}
+
+  paperless-gpt:
+    # Pre-1.0: versione fissata, Renovate senza automerge (renovate.json).
+    image: ghcr.io/icereed/paperless-gpt:v0.31.0
+    restart: unless-stopped
+    depends_on:
+      - webserver
+    # Nessuna porta pubblicata: la UI di paperless-gpt non ha autenticazione
+    # propria. Parla solo con il webserver sulla rete interna del compose.
+    # Niente env_file: i segreti di Paperless non devono arrivare qui, solo le
+    # due variabili sotto (interpolate dal .env).
+    environment:
+      PAPERLESS_BASE_URL: http://webserver:8000
+      PAPERLESS_API_TOKEN: ${PAPERLESS_API_TOKEN}
+      # Unico trigger: solo i documenti con questo tag vanno al provider.
+      AUTO_TAG: ai-process
+      LLM_PROVIDER: anthropic
+      LLM_MODEL: claude-haiku-5-5
+      LLM_LANGUAGE: Italian
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      # Niente OCR LLM e niente vision: al provider va solo il testo che
+      # Paperless ha già estratto, mai le immagini. Non impostare VISION_LLM_*
+      # né mettere i tag di OCR sui documenti.
+      CREATE_NEW_TAGS: "false"
+      LOG_LEVEL: info
+    volumes:
+      # Prompt, impostazioni e storico (undo) sul LV persistente, non sul
+      # disco della LXC. Proprietario 10001 (utente del container).
+      - /mnt/persistent-data/paperless-gpt/prompts:/app/prompts
+      - /mnt/persistent-data/paperless-gpt/config:/app/config
+      - /mnt/persistent-data/paperless-gpt/db:/app/db
 
   gotenberg:
     image: docker.io/gotenberg/gotenberg:8.38
