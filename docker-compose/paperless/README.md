@@ -118,7 +118,7 @@ Traefik-110  192.168.10.110:8099   entrypoint "lan-upload", un router per client
    |  HTTP (solo se IP + password + percorso + metodo sono giusti)
    v
 Paperless-119  rclone serve webdav :8020   (servizio "webdav" dello stack)
-   |  scrive consume/rakazo/<file>.<hash>.partial, poi rinomina
+   |  tiene il file nella cache (vfs-cache-mode writes), lo scrive solo completo
    v
 /mnt/persistent-data/consume/rakazo/<file>
    |  Paperless (CONSUMER_RECURSIVE + SUBDIRS_AS_TAGS)
@@ -153,8 +153,8 @@ Risposta attesa `201`.
 
 ### Dettagli da sapere
 
-- **La sottocartella va creata a mano, una volta.** rclone risponde `409` se manca la cartella padre. Sulla LXC 119: `mkdir /mnt/persistent-data/consume/<client>` e `chown 1000:1000`. Paperless non dovrebbe eliminarla dopo l'acquisizione (da confermare nel test end to end, vedi sotto).
-- **File a metà.** rclone scrive `<nome>.<hash>.partial` e rinomina a fine upload. `PAPERLESS_CONSUMER_IGNORE_PATTERNS` (regex sui file `.partial`) evita che Paperless acquisisca un file incompleto.
+- **La sottocartella va creata a mano, una volta.** rclone risponde `409` se manca la cartella padre. Sulla LXC 119: `mkdir /mnt/persistent-data/consume/<client>` e `chown 1000:1000`. Paperless non la elimina dopo l'acquisizione (verificato il 15/11/2026).
+- **File a metà.** Senza cache, `rclone serve webdav` scrive l'upload direttamente col nome finale (verificato il 15/11/2026 con un upload rallentato): a proteggere ci sarebbero solo i 5 secondi di stabilità di Paperless, e un upload bloccato più a lungo verrebbe acquisito a metà. Per questo il servizio gira con `--vfs-cache-mode=writes`: il file resta nella cache del container e arriva in `consume` solo completo, circa 5 secondi dopo la fine del PUT. `PAPERLESS_CONSUMER_IGNORE_PATTERNS` (regex sui file `.partial`) resta come rete di sicurezza. Limite: la cache sta nel container, quindi se il webdav riparte proprio in quei secondi l'upload si perde anche se il client ha già ricevuto `201`.
 - **inotify.** Funziona sul bind mount del LV (verificato il 14/11/2026): non serve `PAPERLESS_CONSUMER_POLLING`.
 - **Il webdav non ha autenticazione propria.** La sicurezza dipende dal firewall Proxmox di `Paperless-119` (`firewall.tf`): ingresso solo da `Traefik-110` su 8000, 8010 e 8020, e SSH da `192.168.10.200`. Richiede il firewall datacenter attivo (vedi ADR-012). **Ordine di deploy: prima il firewall (`tofu apply`), poi lo stack paperless.**
 - **Egress di Rakazo-118.** Il firewall di `Rakazo-118` blocca le reti private: è stata aggiunta una sola eccezione, in uscita verso `192.168.10.110:8099`. La `:80` di Traefik resta chiusa ai bot.
@@ -191,7 +191,7 @@ Togliere router e middleware dal `lan-upload.yml` (il file provider ricarica da 
 
 Da `Rakazo-118`:
 
-1. `PUT` di un PDF di prova su `/rakazo/prova.pdf`: atteso `201`, il file in `consume/rakazo/` per pochi secondi, poi il documento in Paperless con il tag `rakazo`. Verificare nello stesso passaggio che la cartella `consume/rakazo/` resti dopo l'acquisizione (verificato il: da completare).
+1. `PUT` di un PDF di prova su `/rakazo/prova.pdf`: atteso `201`, il file in `consume/rakazo/` per pochi secondi, poi il documento in Paperless con il tag `rakazo`. Verificare nello stesso passaggio che la cartella `consume/rakazo/` resti dopo l'acquisizione (verificato il 15/11/2026).
 2. Cancellare il documento di prova da Paperless.
 
 Prove negative, da rifare ogni volta (devono essere tutte rifiutate):
