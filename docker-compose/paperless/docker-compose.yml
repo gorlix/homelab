@@ -138,7 +138,7 @@ services:
       - "--chromium-allow-list=^file:///tmp/.*"
 
   tika:
-    image: docker.io/apache/tika:3.3.1.0
+    image: docker.io/apache/tika:3.3.3.0
     restart: unless-stopped
 
   # Server MCP di Paperless (paperless-mcp, tb1337) per Rakazo e Claude Code,
