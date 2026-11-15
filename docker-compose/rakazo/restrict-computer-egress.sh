@@ -93,6 +93,13 @@ egress_rules_v4() {
   printf 'INPUT -i %s+ -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT\n' "$BRIDGE_PREFIX"
   printf 'INPUT -i %s+ -j DROP\n' "$BRIDGE_PREFIX"
   printf 'DOCKER-USER -i %s+ -o %s+ -j RETURN\n' "$BRIDGE_PREFIX" "$BRIDGE_PREFIX"
+  # homelab: unica destinazione privata consentita, l'entrypoint lan-upload di
+  # Traefik-110 da cui i bot caricano file in Paperless (HOME-53/HOME-54). Solo
+  # tcp/8099: le altre porte di Traefik e il resto della LAN restano bloccati.
+  # Prima dei DROP, e parte delle regole gestite: lo script la rimette in
+  # ordine a ogni esecuzione. Il firewall Proxmox di Rakazo-118 ha la stessa
+  # eccezione (firewall.tf). Da riportare a ogni aggiornamento dello script.
+  printf 'DOCKER-USER -i %s+ -d 192.168.10.110/32 -p tcp -m tcp --dport 8099 -j RETURN\n' "$BRIDGE_PREFIX"
   while IFS= read -r cidr; do
     printf 'DOCKER-USER -i %s+ -d %s -j DROP\n' "$BRIDGE_PREFIX" "$cidr"
   done < <(blocked_destinations_v4)

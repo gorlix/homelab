@@ -206,7 +206,7 @@ Prove negative, da rifare ogni volta (devono essere tutte rifiutate):
 | Connessione a `192.168.10.119:8020` da `Rakazo-118` | timeout (firewall) |
 | `192.168.10.110:80` da `Rakazo-118` | timeout (firewall) |
 
-Da verificare: l'egress `restricted` dei computer dei bot potrebbe bloccare gli IP privati anche a livello dell'app Rakazo, non solo del firewall Proxmox.
+Computer dei bot: l'egress `restricted` di Rakazo blocca da iptables (catena `DOCKER-USER`, `docker-compose/rakazo/restrict-computer-egress.sh`) ogni destinazione privata dai bridge `rakazo-c*`, prima ancora del firewall Proxmox. Il 15/11/2026 il test da un computer è andato in timeout; lo script ha ora una sola eccezione segnata `homelab:`, `192.168.10.110` tcp/8099, da riportare a ogni aggiornamento dello script upstream.
 
 ### Estensione futura: Tailscale (non implementata)
 
