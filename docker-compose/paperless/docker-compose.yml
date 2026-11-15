@@ -84,6 +84,16 @@ services:
       # ad Authentik, poi PAPERLESS_DISABLE_REGULAR_LOGIN=true in Infisical.
       # Le API con token (app mobile) funzionano comunque.
       PAPERLESS_DISABLE_REGULAR_LOGIN: ${PAPERLESS_DISABLE_REGULAR_LOGIN:-false}
+      # Cartella consume in LAN (HOME-53, servizio webdav qui sotto): ogni
+      # client scrive in consume/<client>/ e il nome della sottocartella
+      # diventa un tag, così si vede da dove è arrivato un documento.
+      PAPERLESS_CONSUMER_RECURSIVE: "true"
+      PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS: "true"
+      # rclone scrive l'upload in <nome>.<hash>.partial e lo rinomina solo a
+      # fine trasferimento: senza questa regex Paperless potrebbe acquisire un
+      # file a metà. Si aggiunge ai pattern di default, non li sostituisce.
+      # $$ è l'escape di Docker Compose per un $ letterale.
+      PAPERLESS_CONSUMER_IGNORE_PATTERNS: '["^.*\\.partial$$"]'
 
   paperless-gpt:
     # Pre-1.0: versione fissata, Renovate senza automerge (renovate.json).
@@ -174,6 +184,28 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+
+  # Cartella consume raggiungibile dalla LAN (HOME-53). rclone serve la
+  # cartella in WebDAV SENZA autenticazione: chi decide chi può scrivere è
+  # Traefik-110 (entrypoint lan-upload, un router per client con IP consentito,
+  # basicAuth e sottocartella, vedi traefik/dynamic/lan-upload.yml). Il firewall
+  # Proxmox di Paperless-119 (firewall.tf) fa entrare la 8020 solo da
+  # Traefik-110: senza quella regola chiunque in LAN scriverebbe qui direttamente.
+  # Utente 1000 come Paperless, che così può eliminare i file dopo averli
+  # acquisiti.
+  webdav:
+    image: docker.io/rclone/rclone:1.75.2
+    restart: unless-stopped
+    user: "1000:1000"
+    command:
+      - serve
+      - webdav
+      - /consume
+      - --addr=:8020
+    ports:
+      - "8020:8020"
+    volumes:
+      - /mnt/persistent-data/consume:/consume
 
 volumes:
   redisdata:

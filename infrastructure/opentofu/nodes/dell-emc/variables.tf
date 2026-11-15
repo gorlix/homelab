@@ -251,8 +251,10 @@ variable "containers" {
     # (Postgres, media, consume, export) stanno fuori dalla LXC, su un LV
     # dedicato del VG Storage montato su pve: un destroy+recreate non li tocca.
     # Root su Storage per lo stesso motivo di Rakazo-118 (thin pool all'81% il
-    # 13/11/2026). Niente firewall: qui non girano agenti con una shell.
-    # vmid 119 libero, verificato via API Proxmox lo stesso giorno.
+    # 13/11/2026). Firewall attivo dal 14/11/2026 (HOME-53), solo in
+    # ingresso: il webdav della cartella consume non ha autenticazione e deve
+    # essere raggiungibile solo da Traefik-110 (regole in firewall.tf).
+    # vmid 119 libero, verificato via API Proxmox il 13/11/2026.
     "Paperless-119" = {
       vmid           = 119
       ip             = "192.168.10.119/24"
@@ -263,6 +265,7 @@ variable "containers" {
       datastore      = "Storage"
       services       = ["paperless"]
       data_host_path = "/var/lib/pve-persistent/paperless"
+      firewall       = true
     }
 
     # Per aggiungere macchine future basterà inserire qui nuovi blocchi, ad esempio:
