@@ -151,6 +151,8 @@ curl --cacert lan-upload.crt \
 
 Risposta attesa `201`.
 
+Per l'agente di Rakazo (Andrea) c'è una skill dedicata con tutto il flusso (consegna, ricerca del documento via MCP, errori, regole di sicurezza): `skill-andrea-paperless-upload.md` in questa cartella. Contiene il certificato pubblico, quindi va aggiornata quando il certificato viene ruotato. Presuppone che il computer del bot abbia `PAPERLESS_UPLOAD_PASSWORD` nell'ambiente e raggiunga `192.168.10.110:8099`: entrambe le cose sono da verificare (HOME-54).
+
 ### Dettagli da sapere
 
 - **La sottocartella va creata a mano, una volta.** rclone risponde `409` se manca la cartella padre. Sulla LXC 119: `mkdir /mnt/persistent-data/consume/<client>` e `chown 1000:1000`. Paperless non la elimina dopo l'acquisizione (verificato il 15/11/2026).
@@ -185,7 +187,7 @@ Togliere router e middleware dal `lan-upload.yml` (il file provider ricarica da 
 ### Ruotare password e certificato
 
 - **Password.** Nuovi password e hash come al punto 1, aggiornare i due valori su Infisical, ricreare Traefik e aggiornare il client. La rotazione la fa l'autore: la password è una sola per client.
-- **Certificato (scadenza 15/11/2031).** Generare una nuova coppia EC P-256 con SAN `IP:192.168.10.110`, sostituire `traefik/certs/lan-upload.crt`, aggiornare `LAN_UPLOAD_TLS_KEY_B64` su Infisical, ricreare Traefik, distribuire il nuovo `.crt` ai client e aggiornare il fingerprint in questa pagina.
+- **Certificato (scadenza 15/11/2031).** Generare una nuova coppia EC P-256 con SAN `IP:192.168.10.110`, sostituire `traefik/certs/lan-upload.crt`, aggiornare `LAN_UPLOAD_TLS_KEY_B64` su Infisical, ricreare Traefik, distribuire il nuovo `.crt` ai client, aggiornare il blocco del certificato in `skill-andrea-paperless-upload.md` (e rimandarla ad Andrea) e il fingerprint in questa pagina.
 
 ### Test dopo il deploy
 
