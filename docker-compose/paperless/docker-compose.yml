@@ -89,9 +89,10 @@ services:
       # diventa un tag, così si vede da dove è arrivato un documento.
       PAPERLESS_CONSUMER_RECURSIVE: "true"
       PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS: "true"
-      # rclone scrive l'upload in <nome>.<hash>.partial e lo rinomina solo a
-      # fine trasferimento: senza questa regex Paperless potrebbe acquisire un
-      # file a metà. Si aggiunge ai pattern di default, non li sostituisce.
+      # Rete di sicurezza: se rclone copia dalla cache in consume con un file
+      # temporaneo <nome>.<hash>.partial, Paperless non deve acquisirlo. La
+      # protezione vera contro i file a metà è --vfs-cache-mode=writes del
+      # servizio webdav. Si aggiunge ai pattern di default, non li sostituisce.
       # $$ è l'escape di Docker Compose per un $ letterale.
       PAPERLESS_CONSUMER_IGNORE_PATTERNS: '["^.*\\.partial$$"]'
 
@@ -202,6 +203,15 @@ services:
       - webdav
       - /consume
       - --addr=:8020
+      # Senza cache, serve webdav scrive l'upload direttamente col nome finale
+      # in consume (verificato il 15/11/2026): un upload fermo per più di 5 s
+      # (CONSUMER_STABILITY_DELAY) verrebbe acquisito a metà. Con "writes" il
+      # file resta nella cache e arriva in consume solo completo, circa 5 s
+      # dopo la fine del PUT (vfs-write-back). La cache sta nel container:
+      # se il container riparte in quei secondi l'upload si perde e il client
+      # ha già ricevuto 201.
+      - --vfs-cache-mode=writes
+      - --cache-dir=/tmp/rclone-cache
     ports:
       - "8020:8020"
     volumes:
