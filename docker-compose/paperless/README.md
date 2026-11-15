@@ -95,3 +95,134 @@ Per regolare i poteri (variabili in Infisical, poi nuovo deploy):
 
 - **Rakazo.** Voce MCP aggiunta via DB (come per Karakeep): URL `https://mcp-paperless.alessandrogorla.it/mcp`, autenticazione "Bearer token" con la chiave A.
 - **Claude Code (repo homelab).** Server `paperless` a scope local, con URL e chiave A in `.env.mcp` (fuori da git). Vedi la skill `MCP-homelab`.
+
+## Cartella consume in LAN (lan-upload)
+
+Permette a un client della rete locale di caricare file nella cartella `consume` di Paperless, che li acquisisce da sola. Oggi l'unico client è `Rakazo-118`: i suoi bot devono solo **caricare** file (leggere e cercare lo fanno già col server MCP).
+
+Requisiti decisi con l'autore (14/11/2026): solo rete locale `192.168.10.0/24`, niente Internet né Cloudflare Tunnel; un solo punto di gestione degli accessi, `Traefik-110`; un client alla volta, aggiungerne altri deve essere una modifica piccola.
+
+### Perché WebDAV dietro Traefik
+
+- **Traefik autorizza solo HTTP.** SMB, SFTP o NFS passerebbero fuori dal punto di controllo.
+- **Le LXC sono unprivileged.** `Rakazo-118` e `Paperless-119` non possono montare SMB o NFS col kernel.
+- **Un bind mount diretto** della cartella dentro `Rakazo-118` passerebbe fuori da Traefik e non sarebbe revocabile da lì.
+
+### Flusso
+
+```
+Rakazo-118 (192.168.10.118)
+   |  HTTPS, PUT /rakazo/<file>, basicAuth
+   v
+Traefik-110  192.168.10.110:8099   entrypoint "lan-upload", un router per client
+   |  HTTP (solo se IP + password + percorso + metodo sono giusti)
+   v
+Paperless-119  rclone serve webdav :8020   (servizio "webdav" dello stack)
+   |  scrive consume/rakazo/<file>.<hash>.partial, poi rinomina
+   v
+/mnt/persistent-data/consume/rakazo/<file>
+   |  Paperless (CONSUMER_RECURSIVE + SUBDIRS_AS_TAGS)
+   v
+documento acquisito con il tag "rakazo"
+```
+
+### I tre controlli per client
+
+Il router di ogni client (`traefik/dynamic/lan-upload.yml`) li applica tutti e tre; ne basta uno sbagliato per essere rifiutati.
+
+| Controllo | Come | Cosa ferma |
+|---|---|---|
+| IP | `ipAllowList` col solo IP del client (`/32`). Sull'entrypoint non ci sono `forwardedHeaders` fidati: conta l'IP reale della connessione | Qualsiasi altro host della LAN |
+| Credenziale | `basicAuth`, un utente per client. L'hash `apr1` sta su Infisical `prod/traefik` come `LAN_UPLOAD_<CLIENT>_HTPASSWD`, la password è casuale da 40 caratteri | Un host con l'IP giusto ma senza la password |
+| Cartella e metodo | `PathPrefix(/<client>/)` e solo `PUT` | Lettura (`GET`), elenco (`PROPFIND`), cancellazione (`DELETE`), scrittura nelle cartelle di altri |
+
+La sottocartella `consume/<client>/` diventa un tag in Paperless (per Rakazo il tag `rakazo`). Serve per sapere da dove arriva un documento, utile perché i bot maneggiano contenuti non fidati.
+
+### Come carica Rakazo
+
+La password in chiaro è su Infisical `prod/rakazo` come `PAPERLESS_UPLOAD_PASSWORD`. Il certificato è self-signed: i client lo verificano con quello pubblico del repo (`docker-compose/traefik/certs/lan-upload.crt`).
+
+```bash
+curl --cacert lan-upload.crt \
+     -u rakazo:"$PAPERLESS_UPLOAD_PASSWORD" \
+     -T fattura.pdf \
+     https://192.168.10.110:8099/rakazo/fattura.pdf
+```
+
+Risposta attesa `201`.
+
+### Dettagli da sapere
+
+- **La sottocartella va creata a mano, una volta.** rclone risponde `409` se manca la cartella padre. Sulla LXC 119: `mkdir /mnt/persistent-data/consume/<client>` e `chown 1000:1000`. Paperless non dovrebbe eliminarla dopo l'acquisizione (da confermare nel test end to end, vedi sotto).
+- **File a metà.** rclone scrive `<nome>.<hash>.partial` e rinomina a fine upload. `PAPERLESS_CONSUMER_IGNORE_PATTERNS` (regex sui file `.partial`) evita che Paperless acquisisca un file incompleto.
+- **inotify.** Funziona sul bind mount del LV (verificato il 14/11/2026): non serve `PAPERLESS_CONSUMER_POLLING`.
+- **Il webdav non ha autenticazione propria.** La sicurezza dipende dal firewall Proxmox di `Paperless-119` (`firewall.tf`): ingresso solo da `Traefik-110` su 8000, 8010 e 8020, e SSH da `192.168.10.200`. Richiede il firewall datacenter attivo (vedi ADR-012). **Ordine di deploy: prima il firewall (`tofu apply`), poi lo stack paperless.**
+- **Egress di Rakazo-118.** Il firewall di `Rakazo-118` blocca le reti private: è stata aggiunta una sola eccezione, in uscita verso `192.168.10.110:8099`. La `:80` di Traefik resta chiusa ai bot.
+
+### TLS
+
+Certificato self-signed EC P-256, validità 5 anni (scade il **14/11/2031**), SAN `IP:192.168.10.110`, fingerprint SHA-256 `6B:04:5B:C4:BA:4C:08:BF:A8:88:DE:A0:0E:1B:0E:10:27:E7:AE:F2:3E:1E:22:BC:FB:4B:BF:4E:D6:0B:EA:85`. Viene servito come certificato di default perché i client si collegano per IP, quindi senza SNI. La parte pubblica è in `traefik/certs/lan-upload.crt`; la chiave sta su Infisical `prod/traefik` come `LAN_UPLOAD_TLS_KEY_B64` (PEM in base64) e `lan-upload.yml` la decodifica con i template Go di Traefik (`b64dec` e `indent`).
+
+Perché non Let's Encrypt con DNS-01: richiederebbe una chiamata esterna e un token Cloudflare con permessi DNS dentro Traefik, e il nome finirebbe nei log di Certificate Transparency. Il prezzo: rinnovo manuale e un avviso nei browser e nei telefoni. Quando arriveranno client con un browser si passa a DNS-01: cambia solo il certificato, i router restano uguali.
+
+### Aggiungere un client
+
+Esempio per un client `<client>` con IP `<ip>`. Password e hash non vanno mai stampati a terminale o in chat.
+
+1. **Password e hash**, senza mostrarli: generare la password casuale da 40 caratteri e l'hash `apr1` (`openssl passwd -apr1`) in variabili di shell e passarli direttamente a Infisical, senza `echo`.
+2. **Infisical.** In `prod/traefik`: `LAN_UPLOAD_<CLIENT>_HTPASSWD` col valore `<client>:<hash apr1>`. Sul progetto del client: la password in chiaro (per Rakazo, `PAPERLESS_UPLOAD_PASSWORD` in `prod/rakazo`).
+3. **Compose di Traefik.** Aggiungere `LAN_UPLOAD_<CLIENT>_HTPASSWD: ${LAN_UPLOAD_<CLIENT>_HTPASSWD:?manca su Infisical prod/traefik}` sotto `environment` in `docker-compose/traefik/docker-compose.yml`.
+4. **Router e middleware.** In `traefik/dynamic/lan-upload.yml` copiare il router `lan-upload-rakazo` e i suoi due middleware (`-ip`, `-auth`), cambiando nome, IP in `sourceRange`, prefisso `PathPrefix` e variabile. Niente doppie graffe nei commenti del file: passano dal template.
+5. **Cartella.** Sulla LXC 119: `mkdir /mnt/persistent-data/consume/<client>` e `chown 1000:1000` sulla stessa.
+6. **Firewall, se il client è una LXC isolata** (come Rakazo-118): una regola `out` verso `192.168.10.110:8099` in `firewall.tf`, poi `tofu apply`. Prima, cercare `forces replacement` nel plan (ADR-010).
+7. **Test locale:** `scripts/lan-upload-test.sh` dalla radice del repo (servono solo Docker e openssl). Deve passare prima di ogni deploy che tocca `lan-upload.yml`.
+8. **Deploy.** Traefik va **ricreata** quando cambiano le variabili `LAN_UPLOAD_*`: pochi secondi di interruzione di tutte le route pubbliche. Poi i test qui sotto.
+
+### Revocare un client
+
+Togliere router e middleware dal `lan-upload.yml` (il file provider ricarica da solo), poi rimuovere la variabile `LAN_UPLOAD_<CLIENT>_HTPASSWD` da Infisical e dal compose di Traefik, e la regola firewall se c'era. I documenti già caricati restano in Paperless con il loro tag.
+
+### Ruotare password e certificato
+
+- **Password.** Nuovi password e hash come al punto 1, aggiornare i due valori su Infisical, ricreare Traefik e aggiornare il client. La rotazione la fa l'autore: la password è una sola per client.
+- **Certificato (scadenza 14/11/2031).** Generare una nuova coppia EC P-256 con SAN `IP:192.168.10.110`, sostituire `traefik/certs/lan-upload.crt`, aggiornare `LAN_UPLOAD_TLS_KEY_B64` su Infisical, ricreare Traefik, distribuire il nuovo `.crt` ai client e aggiornare il fingerprint in questa pagina.
+
+### Test dopo il deploy
+
+Da `Rakazo-118`:
+
+1. `PUT` di un PDF di prova su `/rakazo/prova.pdf`: atteso `201`, il file in `consume/rakazo/` per pochi secondi, poi il documento in Paperless con il tag `rakazo`. Verificare nello stesso passaggio che la cartella `consume/rakazo/` resti dopo l'acquisizione (verificato il: da completare).
+2. Cancellare il documento di prova da Paperless.
+
+Prove negative, da rifare ogni volta (devono essere tutte rifiutate):
+
+| Prova | Atteso |
+|---|---|
+| `PUT` con password sbagliata | `401` |
+| `PUT` da un altro host della LAN (stesse credenziali) | `403` |
+| `GET` o `PROPFIND` su `/rakazo/` | rifiutato (`404`: nessun router li accetta) |
+| `DELETE` su un file | rifiutato (`404`) |
+| `PUT` su `/altro/file.pdf` | rifiutato (`404`) |
+| Connessione a `192.168.10.119:8020` da `Rakazo-118` | timeout (firewall) |
+| `192.168.10.110:80` da `Rakazo-118` | timeout (firewall) |
+
+Da verificare: l'egress `restricted` dei computer dei bot potrebbe bloccare gli IP privati anche a livello dell'app Rakazo, non solo del firewall Proxmox.
+
+### Estensione futura: Tailscale (non implementata)
+
+Lo stesso schema funziona per un client sulla tailnet, con un punto da decidere. Se il nodo Tailscale della Region B fa da subnet router con SNAT (il default), Traefik vede l'IP LAN del router per tutti i dispositivi della tailnet e l'`ipAllowList` non li distingue. Due strade:
+
+- mettere in allowlist l'IP del router e delegare il controllo per dispositivo alle ACL di Tailscale (due punti di controllo invece di uno);
+- disattivare lo SNAT, oppure mettere Tailscale direttamente su `Traefik-110`. In entrambi i casi serve una rotta per `100.64.0.0/10` su `Traefik-110`, e il gateway Cisco non è modificabile dall'autore.
+
+Il certificato andrebbe riemesso con il nuovo IP (o un nome) nel SAN.
+
+### Da tenere presente
+
+- **L'`ipAllowList` si fida dell'IP.** `ipfilter` di Proxmox protegge le LXC con firewall, non gli altri host della LAN, che è gestita da terzi: chi si prende l'IP di un client e ne conosce la password può caricare file.
+- **`basicAuth` è una password condivisa per client**, in chiaro nel client e ruotata a mano.
+- **Il webdav dipende dal firewall.** Senza il firewall datacenter attivo e la regola sulla 8020, chiunque in LAN scrive in `consume` senza autenticazione.
+- **Un errore in `lan-upload.yml` fa cadere anche `dynamic.yml`.** Il file usa i template Go: un errore (anche in un commento con le doppie graffe) fa fallire tutto il file provider all'avvio, quindi anche le route pubbliche. È successo durante lo sviluppo; per questo esiste `scripts/lan-upload-test.sh`.
+- **Un file in attesa di acquisizione resta nella cartella per pochi secondi.**
+- **Aggiungere un client ricrea Traefik**, con una breve interruzione delle route pubbliche.
+- **Certificato a rinnovo manuale** (14/11/2031) e avviso nei browser.

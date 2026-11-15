@@ -22,6 +22,13 @@ services:
       # restano non fidati. Se traefik_proxy venisse ricreata con un'altra subnet,
       # questo valore va aggiornato.
       - --entrypoints.web.forwardedHeaders.trustedIPs=172.19.0.0/16
+      # Entrypoint solo LAN per caricare file nella cartella consume di
+      # Paperless (HOME-53). Nessuna route del tunnel punta qui e nessun
+      # forwardedHeaders: l'IP che vede l'ipAllowList dei router è quello reale
+      # della connessione, non un X-Forwarded-For che il client può inventare.
+      # TLS con il certificato self-signed di dynamic/lan-upload.yml.
+      - --entrypoints.lan-upload.address=:8099
+      - --entrypoints.lan-upload.http.tls=true
       # API (senza dashboard) per traefik-manager-agent. api.insecure la serve
       # sull'entrypoint interno "traefik" (:8080), che NON è pubblicato: la
       # raggiungono solo i container su traefik_proxy (cloudflared e l'agent),
@@ -39,6 +46,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./dynamic:/etc/traefik/dynamic:ro
+      # Certificato pubblico di lan-upload (la chiave arriva da Infisical).
+      - ./certs:/etc/traefik/certs:ro
       - traefik_logs:/var/log/traefik
     ports:
       # Pubblicata sull'host invece di usare il nome Docker interno "traefik:80":
@@ -48,6 +57,15 @@ services:
       # ma un IP:porta pubblicato resta comunque più robusto di un nome Docker
       # interno se in futuro tornasse a esserci più di un connector attivo.
       - "80:80"
+      # lan-upload (vedi sopra). Pubblicata sull'host: i client LAN la
+      # raggiungono a 192.168.10.110:8099 con il loro IP originale.
+      - "8099:8099"
+    # Segreti di lan-upload, letti da dynamic/lan-upload.yml con i template di
+    # Traefik ({{ env "..." }}). Interpolati uno per uno invece di env_file: a
+    # Traefik non serve il TUNNEL_TOKEN. Su Infisical prod/traefik.
+    environment:
+      LAN_UPLOAD_TLS_KEY_B64: ${LAN_UPLOAD_TLS_KEY_B64:?manca su Infisical prod/traefik}
+      LAN_UPLOAD_RAKAZO_HTPASSWD: ${LAN_UPLOAD_RAKAZO_HTPASSWD:?manca su Infisical prod/traefik}
     networks:
       - traefik_proxy
 

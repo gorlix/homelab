@@ -205,7 +205,9 @@ resource "terraform_data" "run_ansible" {
     proxmox_virtual_environment_container.rocky_targets,
     local_file.ansible_inventory,
     proxmox_virtual_environment_firewall_options.isolated,
-    proxmox_virtual_environment_firewall_rules.isolated
+    proxmox_virtual_environment_firewall_rules.isolated,
+    proxmox_virtual_environment_firewall_options.paperless,
+    proxmox_virtual_environment_firewall_rules.paperless
   ]
 
   triggers_replace = [

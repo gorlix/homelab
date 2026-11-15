@@ -1,6 +1,7 @@
 # Firewall Proxmox per le LXC che fanno girare agenti AI con una shell o un
 # computer: Maus-117 (OpenMausBot, ADR-012) e Rakazo-118 (Rakazo, ADR-013).
 # Stesse regole per entrambe, cambia solo la porta su cui entra Traefik-110.
+# In fondo al file Paperless-119, con regole proprie (solo ingresso, HOME-53).
 # Le altre LXC non hanno firewall (firewall = false in variables.tf).
 #
 # PREREQUISITO MANUALE, fuori da Tofu: queste regole valgono solo se il firewall
@@ -111,6 +112,22 @@ resource "proxmox_virtual_environment_firewall_rules" "isolated" {
     dport   = "53"
   }
 
+  # Unica eccezione al blocco qui sotto, solo per Rakazo-118: l'entrypoint
+  # lan-upload di Traefik-110, da cui i bot caricano file nella cartella
+  # consume di Paperless (HOME-53). Solo la 8099: le route pubbliche su :80
+  # restano irraggiungibili dalla LAN dei bot.
+  dynamic "rule" {
+    for_each = each.key == "Rakazo-118" ? [1] : []
+    content {
+      type    = "out"
+      action  = "ACCEPT"
+      comment = "Upload verso Paperless via Traefik-110 lan-upload (HOME-53)"
+      dest    = "192.168.10.110"
+      proto   = "tcp"
+      dport   = "8099"
+    }
+  }
+
   # Tutto il resto verso reti private è bloccato: LAN di casa e della ditta
   # (192.168.0.0/16 copre anche 192.168.10.0/24), altri RFC1918, CGNAT di
   # Tailscale/Netbird, link-local. Quello che non è qui esce verso Internet
@@ -122,5 +139,76 @@ resource "proxmox_virtual_environment_firewall_rules" "isolated" {
     comment = "Nessun accesso a reti private dalla LXC dei bot"
     dest    = "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,169.254.0.0/16"
     log     = "info"
+  }
+}
+
+# Paperless-119 (HOME-53): firewall solo in ingresso. Serve perché il servizio
+# webdav dello stack paperless (porta 8020) non ha autenticazione propria: chi
+# può scrivere lo decide Traefik-110 (entrypoint lan-upload). Senza queste
+# regole chiunque nella LAN scriverebbe nella cartella consume saltando
+# Traefik. In uscita nessun limite: Paperless deve raggiungere IMAP, il
+# provider di paperless-gpt e i registry.
+resource "proxmox_virtual_environment_firewall_options" "paperless" {
+  provider   = proxmox.secure
+  depends_on = [proxmox_virtual_environment_firewall_rules.paperless]
+
+  node_name    = "pve"
+  container_id = proxmox_virtual_environment_container.rocky_targets["Paperless-119"].vm_id
+
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+  # Come per le LXC isolate: senza ipfilter root nella LXC potrebbe prendersi
+  # un altro IP (per esempio quello di Traefik-110).
+  ipfilter  = true
+  macfilter = true
+  dhcp      = false
+  radv      = false
+  ndp       = false
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "paperless" {
+  provider     = proxmox.secure
+  node_name    = "pve"
+  container_id = proxmox_virtual_environment_container.rocky_targets["Paperless-119"].vm_id
+
+  # Traefik-110 è l'unico client di web UI (8000), server MCP (8010) e webdav
+  # (8020). Verificato il 14/11/2026 che nessun altro host apre connessioni
+  # verso la LXC (hawser in ascolto ma Dockhand non la gestisce, niente
+  # monitoring): stessa scelta di Maus-117 e Rakazo-118.
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "Traefik-110 verso la web UI di Paperless"
+    source  = "192.168.10.110"
+    proto   = "tcp"
+    dport   = "8000"
+  }
+
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "Traefik-110 verso il server MCP di Paperless"
+    source  = "192.168.10.110"
+    proto   = "tcp"
+    dport   = "8010"
+  }
+
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "Traefik-110 verso il webdav della cartella consume (HOME-53)"
+    source  = "192.168.10.110"
+    proto   = "tcp"
+    dport   = "8020"
+  }
+
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "SSH da pve-management (Ansible)"
+    source  = "192.168.10.200"
+    proto   = "tcp"
+    dport   = "22"
   }
 }

@@ -1,0 +1,66 @@
+# lan-upload: caricare file nella cartella consume di Paperless dalla LAN
+# (HOME-53). Unico punto in cui si decide chi può scrivere. Ogni client ha un
+# router con tre controlli, tutti obbligatori:
+#   - IP: ipAllowList con il solo IP del client. Sull'entrypoint lan-upload
+#     non ci sono forwardedHeaders fidati, quindi conta l'IP reale della
+#     connessione, non un X-Forwarded-For.
+#   - credenziale: basicAuth con un utente per client. L'hash arriva da
+#     Infisical prod/traefik come variabile d'ambiente, non è nel repo.
+#   - cartella: PathPrefix(/<client>/) e solo il metodo PUT. Il client può
+#     caricare file nella sua sottocartella e nient'altro: niente elenco
+#     (PROPFIND), lettura (GET) o cancellazione (DELETE).
+# La sottocartella diventa un tag in Paperless (CONSUMER_SUBDIRS_AS_TAGS).
+#
+# Aggiungere un client: copiare router e i due middleware di rakazo, cambiare
+# nome, IP e prefisso, aggiungere LAN_UPLOAD_<CLIENT>_HTPASSWD su Infisical e
+# nel docker-compose.yml di Traefik. Revocarlo: togliere il router. Procedura
+# completa in docker-compose/paperless/README.md.
+#
+# Questo file usa i template Go di Traefik (funzione env): un errore qui fa
+# fallire tutto il file provider all'avvio, cioè anche tutte le route di
+# dynamic.yml. Anche i commenti passano dal template, quindi niente doppie
+# graffe nei commenti. Prima del deploy va provato con lo script di test
+# (vedi README di paperless).
+http:
+  routers:
+    lan-upload-rakazo:
+      rule: "PathPrefix(`/rakazo/`) && Method(`PUT`)"
+      entryPoints:
+        - lan-upload
+      middlewares:
+        - lan-upload-rakazo-ip
+        - lan-upload-rakazo-auth
+      service: paperless-webdav
+      tls: {}
+
+  middlewares:
+    lan-upload-rakazo-ip:
+      ipAllowList:
+        sourceRange:
+          - "192.168.10.118/32"
+    lan-upload-rakazo-auth:
+      basicAuth:
+        users:
+          - '{{ env "LAN_UPLOAD_RAKAZO_HTPASSWD" }}'
+        removeHeader: true
+
+  services:
+    # rclone serve webdav nello stack paperless su Paperless-119. Il firewall
+    # Proxmox della LXC accetta la 8020 solo da qui.
+    paperless-webdav:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.119:8020"
+
+# Certificato self-signed (5 anni, SAN IP:192.168.10.110), servito come
+# default perché i client si collegano per IP, senza SNI. La parte pubblica è
+# nel repo (certs/lan-upload.crt, i client la usano con curl --cacert), la
+# chiave arriva da Infisical in base64 e qui torna PEM, indentata per restare
+# dentro il blocco YAML.
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /etc/traefik/certs/lan-upload.crt
+        keyFile: |
+{{ env "LAN_UPLOAD_TLS_KEY_B64" | b64dec | indent 10 }}
