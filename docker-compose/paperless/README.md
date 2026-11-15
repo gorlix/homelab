@@ -161,7 +161,7 @@ Risposta attesa `201`.
 
 ### TLS
 
-Certificato self-signed EC P-256, validità 5 anni (scade il **14/11/2031**), SAN `IP:192.168.10.110`, fingerprint SHA-256 `6B:04:5B:C4:BA:4C:08:BF:A8:88:DE:A0:0E:1B:0E:10:27:E7:AE:F2:3E:1E:22:BC:FB:4B:BF:4E:D6:0B:EA:85`. Viene servito come certificato di default perché i client si collegano per IP, quindi senza SNI. La parte pubblica è in `traefik/certs/lan-upload.crt`; la chiave sta su Infisical `prod/traefik` come `LAN_UPLOAD_TLS_KEY_B64` (PEM in base64) e `lan-upload.yml` la decodifica con i template Go di Traefik (`b64dec` e `indent`).
+Certificato self-signed EC P-256, validità 5 anni (scade il **15/11/2031**), SAN `IP:192.168.10.110`, fingerprint SHA-256 `D0:9C:37:A6:FE:FE:53:A9:DC:DC:23:55:92:A8:86:41:E9:55:64:BB:7F:46:3A:C0:2C:F6:DB:E1:3A:7F:17:A5`. Viene servito come certificato di default perché i client si collegano per IP, quindi senza SNI. La parte pubblica è in `traefik/certs/lan-upload.crt`; la chiave sta su Infisical `prod/traefik` come `LAN_UPLOAD_TLS_KEY_B64` (PEM in base64) e `lan-upload.yml` la decodifica con i template Go di Traefik (`b64dec` e `indent`).
 
 Perché non Let's Encrypt con DNS-01: richiederebbe una chiamata esterna e un token Cloudflare con permessi DNS dentro Traefik, e il nome finirebbe nei log di Certificate Transparency. Il prezzo: rinnovo manuale e un avviso nei browser e nei telefoni. Quando arriveranno client con un browser si passa a DNS-01: cambia solo il certificato, i router restano uguali.
 
@@ -169,7 +169,7 @@ Perché non Let's Encrypt con DNS-01: richiederebbe una chiamata esterna e un to
 
 Esempio per un client `<client>` con IP `<ip>`. Password e hash non vanno mai stampati a terminale o in chat.
 
-1. **Password e hash**, senza mostrarli: generare la password casuale da 40 caratteri e l'hash `apr1` (`openssl passwd -apr1`) in variabili di shell e passarli direttamente a Infisical, senza `echo`.
+1. **Password e hash**, senza mostrarli: generare la password casuale da 40 caratteri e l'hash `apr1` (`openssl passwd -apr1 -stdin`) su tmpfs e caricarli con `infisical secrets set --file=<file>.yaml`, un file YAML con i valori tra apici singoli (così `$` e `/` dell'hash restano letterali), poi distruggerlo con `shred`. Attenzione: la CLI di Infisical 0.44.6 non supporta la forma `KEY=@file`, e salva come valore il percorso del file (successo il 15/11/2026, Traefik ha rifiutato chiave e utente). Dopo il caricamento, verificare rileggendo da Infisical che la chiave corrisponda al certificato e l'hash alla password, senza stampare i valori.
 2. **Infisical.** In `prod/traefik`: `LAN_UPLOAD_<CLIENT>_HTPASSWD` col valore `<client>:<hash apr1>`. Sul progetto del client: la password in chiaro (per Rakazo, `PAPERLESS_UPLOAD_PASSWORD` in `prod/rakazo`).
 3. **Compose di Traefik.** Aggiungere `LAN_UPLOAD_<CLIENT>_HTPASSWD: ${LAN_UPLOAD_<CLIENT>_HTPASSWD:?manca su Infisical prod/traefik}` sotto `environment` in `docker-compose/traefik/docker-compose.yml`.
 4. **Router e middleware.** In `traefik/dynamic/lan-upload.yml` copiare il router `lan-upload-rakazo` e i suoi due middleware (`-ip`, `-auth`), cambiando nome, IP in `sourceRange`, prefisso `PathPrefix` e variabile. Niente doppie graffe nei commenti del file: passano dal template.
@@ -185,7 +185,7 @@ Togliere router e middleware dal `lan-upload.yml` (il file provider ricarica da 
 ### Ruotare password e certificato
 
 - **Password.** Nuovi password e hash come al punto 1, aggiornare i due valori su Infisical, ricreare Traefik e aggiornare il client. La rotazione la fa l'autore: la password è una sola per client.
-- **Certificato (scadenza 14/11/2031).** Generare una nuova coppia EC P-256 con SAN `IP:192.168.10.110`, sostituire `traefik/certs/lan-upload.crt`, aggiornare `LAN_UPLOAD_TLS_KEY_B64` su Infisical, ricreare Traefik, distribuire il nuovo `.crt` ai client e aggiornare il fingerprint in questa pagina.
+- **Certificato (scadenza 15/11/2031).** Generare una nuova coppia EC P-256 con SAN `IP:192.168.10.110`, sostituire `traefik/certs/lan-upload.crt`, aggiornare `LAN_UPLOAD_TLS_KEY_B64` su Infisical, ricreare Traefik, distribuire il nuovo `.crt` ai client e aggiornare il fingerprint in questa pagina.
 
 ### Test dopo il deploy
 
@@ -225,4 +225,4 @@ Il certificato andrebbe riemesso con il nuovo IP (o un nome) nel SAN.
 - **Un errore in `lan-upload.yml` fa cadere anche `dynamic.yml`.** Il file usa i template Go: un errore (anche in un commento con le doppie graffe) fa fallire tutto il file provider all'avvio, quindi anche le route pubbliche. È successo durante lo sviluppo; per questo esiste `scripts/lan-upload-test.sh`.
 - **Un file in attesa di acquisizione resta nella cartella per pochi secondi.**
 - **Aggiungere un client ricrea Traefik**, con una breve interruzione delle route pubbliche.
-- **Certificato a rinnovo manuale** (14/11/2031) e avviso nei browser.
+- **Certificato a rinnovo manuale** (15/11/2031) e avviso nei browser.
