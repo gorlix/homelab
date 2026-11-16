@@ -128,7 +128,7 @@ services:
       - /mnt/persistent-data/paperless-gpt/db:/app/db
 
   gotenberg:
-    image: docker.io/gotenberg/gotenberg:8.38
+    image: docker.io/gotenberg/gotenberg:8.40
     restart: unless-stopped
     # Upstream: la route chromium serve a convertire le .eml, senza JavaScript
     # né contenuti esterni (pixel di tracciamento).
