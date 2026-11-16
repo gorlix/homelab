@@ -14,7 +14,7 @@
 services:
   gitlab-runner:
     # Versione fissata: Renovate propone gli aggiornamenti.
-    image: gitlab/gitlab-runner:v19.4.1
+    image: gitlab/gitlab-runner:v19.5.3
     container_name: gitlab-runner
     restart: unless-stopped
     volumes:
