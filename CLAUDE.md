@@ -41,6 +41,7 @@ Tutti e 3 su **Proxmox VE**.
 - Authentik (SSO centralizzato)
 - Monitoring infrastruttura
 - Karakeep (bookmark manager, successore di Hoarder) — su `Docker-100`, pubblico come `karakeep.alessandrogorla.it` via Cloudflare Tunnel `Gorla` → Traefik-110 → `192.168.10.100:3020`; segreti su Infisical `prod/karakeep`, signup chiuso di default, tagging AI via OpenRouter, backup notturno su `pve` fuori dalla LXC (stessi limiti di PACA: non 3-2-1)
+- Vault di Carlo (CRM dei contatti personali per il bot Rakazo Carlo, HOME-56) — su `Docker-100`, stack `carlo-vault`: note markdown in formato Obsidian servite da `@bitbonsai/mcpvault` dietro mcp-proxy (`192.168.10.100:3034`, pubblico come `mcp-carlo.alessandrogorla.it`, token Bearer); un sidecar git committa ogni 5 minuti e fa push su un repo GitHub privato (storico + copia fuori sede, niente backup su `pve`); segreti su Infisical `prod/carlo-vault`
 - PACA (project management AI-native) — su LXC dedicata `Paca-120`, isolata da `Docker-100` per il rischio `docker.sock` di `agent-runner` (vedi ADR-009)
 - Runner GitHub Actions self-hosted + staging di `project_minder` — su LXC dedicata `Minder-130`, stesso schema di isolamento di `Paca-120`; unità creata ma runner e stack non ancora installati (vedi ADR-011)
 - OpenMausBot (harness self-hosted che fa girare agenti AI come bot in una chat, con shell reale) — su LXC dedicata `Maus-117` (`192.168.10.117`), pubblico come `maus.alessandrogorla.it` via Cloudflare Tunnel `Gorla` → Traefik-110 → `192.168.10.117:8080` (Caddy), auth = pairing del server (niente Authentik forward-auth); prima unità chiusa dal firewall Proxmox (`firewall.tf`: ingresso solo da Traefik-110 e SSH da `pve-management`, niente reti private in uscita, richiede firewall datacenter attivo), backup notturno best-effort su `pve` fuori dalla LXC (stessi limiti di PACA/Karakeep: non 3-2-1, contiene token degli engine), niente automerge Renovate (pre-1.0) (vedi ADR-012)
@@ -84,7 +85,7 @@ homelab/
 ├── docker-compose/              # stessa cartella, stesso nome, dei nodi reali (es. /opt/docker-compose
 │   │                            # su pve-management) — tracciata direttamente, non una copia separata
 │   │                            # (ADR-008). Servizi reali oggi: 1password-connect, infisical,
-│   │                            # linkwarden, monitoring, traefik, hawser, Semaphore, renovate, paca, karakeep, openmausbot, rakazo.
+│   │                            # linkwarden, monitoring, traefik, hawser, Semaphore, renovate, paca, karakeep, openmausbot, rakazo, carlo-vault.
 │   ├── traefik/
 │   ├── adguard/                # non ancora versionato (Region A)
 │   │   ├── keepalived/

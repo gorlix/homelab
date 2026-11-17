@@ -1,0 +1,96 @@
+# Vault di note markdown del bot Rakazo "Carlo" (HOME-56): il CRM dei contatti
+# personali di Ale. Una nota per persona e una per azienda, collegate da
+# wikilink e frontmatter (chi lavora dove, chi ha presentato chi). Il formato è
+# quello di Obsidian: il vault si apre in Obsidian così com'è.
+#
+# Due servizi sulla stessa cartella ./vault:
+# - mcp: il server MCP (mcpvault, stdio) dietro mcp-proxy, che lo espone in
+#   streamable-http con token Bearer. Stesso schema di karakeep/mcp.
+# - git: committa ogni 5 minuti quello che Carlo ha cambiato e fa push su un
+#   repo GitHub privato. È lo storico (ogni errore di Carlo si annulla con git,
+#   per questo Carlo può anche cancellare) e la copia fuori da Docker-100.
+#   Il commit lo fa il container e non il bot: niente tool git da esporre e
+#   niente "ricordati di committare" nelle istruzioni.
+#
+# .env non presente qui: CARLO_VAULT_MCP_AUTH_TOKEN e CARLO_VAULT_DEPLOY_KEY
+# stanno su Infisical in prod/carlo-vault (ADR-007), il .env lo genera Ansible.
+#
+# Gira su Docker-100 e non su Rakazo-118 per lo stesso motivo dei server Google
+# e Karakeep (ADR-013): i dati restano lontani dai computer dei bot.
+
+services:
+  mcp:
+    image: ghcr.io/tbxark/mcp-proxy:v1.1.0
+    restart: unless-stopped
+    environment:
+      CARLO_VAULT_MCP_AUTH_TOKEN: ${CARLO_VAULT_MCP_AUTH_TOKEN:?manca su Infisical prod/carlo-vault}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        python3 - <<'EOF'
+        import json, os
+        cfg = {
+          "mcpProxy": {
+            "baseURL": "https://mcp-carlo.alessandrogorla.it",
+            "addr": ":9090",
+            "name": "Carlo vault MCP",
+            "version": "1.0.0",
+            "type": "streamable-http",
+            "options": {"authTokens": [os.environ["CARLO_VAULT_MCP_AUTH_TOKEN"]], "logEnabled": True},
+          },
+          "mcpServers": {
+            "vault": {
+              # Versione fissata a mano: npx scarica sempre questa, Renovate
+              # non la vede. Prima di aggiornarla, verificare su npm che esista.
+              "command": "npx",
+              "args": ["-y", "@bitbonsai/mcpvault@0.18.4", "/vault"],
+              "timeout": "60s",
+            }
+          },
+        }
+        os.umask(0o077)
+        json.dump(cfg, open("/tmp/config.json", "w"))
+        EOF
+        exec /main --config /tmp/config.json
+    volumes:
+      - ./vault:/vault
+    ports:
+      # 3020-3021 Karakeep, 3030-3033 server MCP Google.
+      - 3034:9090
+    depends_on:
+      - git
+
+  git:
+    image: alpine/git:v2.54.1
+    restart: unless-stopped
+    environment:
+      # Chiave privata della deploy key (scrittura) del solo repo del vault, in
+      # base64 su una riga: un valore multiriga in .env si rompe facilmente.
+      CARLO_VAULT_DEPLOY_KEY: ${CARLO_VAULT_DEPLOY_KEY:?manca su Infisical prod/carlo-vault}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        umask 077
+        mkdir -p ~/.ssh
+        echo "$$CARLO_VAULT_DEPLOY_KEY" | base64 -d > ~/.ssh/id_ed25519
+        # Chiave host di GitHub fissata (da api.github.com/meta) invece di
+        # ssh-keyscan: un keyscan a ogni avvio accetterebbe qualunque server.
+        echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > ~/.ssh/known_hosts
+        git config --global user.name "Carlo (Rakazo)"
+        git config --global user.email "carlo-vault@noreply.invalid"
+        git config --global --add safe.directory /vault
+        cd /vault
+        # Primo avvio (o ./vault perso): riparte dal repo, storico compreso.
+        [ -d .git ] || git clone -q git@github.com:gorlix/carlo-vault.git .
+        while true; do
+          git add -A
+          git diff --cached --quiet || git commit -q -m "carlo: $$(date -u +%FT%TZ)"
+          # Se il push fallisce (rete, GitHub giù) il commit resta in locale e
+          # riparte al giro dopo: nessun dato perso.
+          git push -q origin HEAD || echo "push fallito, riprovo tra 5 minuti"
+          sleep 300
+        done
+    volumes:
+      - ./vault:/vault
