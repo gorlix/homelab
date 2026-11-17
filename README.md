@@ -192,7 +192,7 @@ homelab/
 │   │                           # dei nodi reali, tracciata direttamente (ADR-008).
 │   │                           # Reali oggi: 1password-connect, infisical, linkwarden,
 │   │                           # monitoring, traefik, hawser, Semaphore, renovate,
-│   │                           # paca, karakeep, openmausbot, rakazo.
+│   │                           # paca, karakeep, openmausbot, rakazo, carlo-vault.
 │   ├── traefik/
 │   ├── adguard/                # non ancora versionato (Region A)
 │   ├── frigate/                # non ancora versionato (Region A)

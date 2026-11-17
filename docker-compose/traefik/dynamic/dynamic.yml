@@ -86,6 +86,14 @@ http:
         - web
       service: mcp-karakeep
 
+    # Server MCP del vault di Carlo (stack carlo-vault su Docker-100, HOME-56).
+    # Come Karakeep: niente forward-auth, chiede un token Bearer.
+    mcp-carlo:
+      rule: "Host(`mcp-carlo.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: mcp-carlo
+
     # Server MCP di Paperless (servizio mcp nello stack paperless su 119). Niente
     # forward-auth: chiede un token Bearer, e un login Authentik romperebbe i
     # client (HOME-52).
@@ -203,6 +211,13 @@ http:
       loadBalancer:
         servers:
           - url: "http://192.168.10.100:3021"
+        responseForwarding:
+          flushInterval: "-1"
+
+    mcp-carlo:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.100:3034"
         responseForwarding:
           flushInterval: "-1"
 
