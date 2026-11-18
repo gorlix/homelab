@@ -77,6 +77,11 @@ http:
       entryPoints:
         - web
       service: mcp-tasks
+    mcp-contacts:
+      rule: "Host(`mcp-contacts.alessandrogorla.it`)"
+      entryPoints:
+        - web
+      service: mcp-contacts
 
     # Server MCP di Karakeep (mcp-proxy nello stack karakeep). Stessa logica
     # dei server Google: niente forward-auth, chiede un token Bearer.
@@ -180,7 +185,7 @@ http:
         responseForwarding:
           flushInterval: "-1"
 
-    # Server MCP Google su Docker-100, porte 3030-3033 (3000/3010/3020 già
+    # Server MCP Google su Docker-100, porte 3030-3033 e 3035 (3000/3010/3020 già
     # occupate). flushInterval -1: streamable-http può rispondere in SSE.
     mcp-gmail:
       loadBalancer:
@@ -204,6 +209,12 @@ http:
       loadBalancer:
         servers:
           - url: "http://192.168.10.100:3033"
+        responseForwarding:
+          flushInterval: "-1"
+    mcp-contacts:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.100:3035"
         responseForwarding:
           flushInterval: "-1"
 

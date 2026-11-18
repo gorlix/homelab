@@ -132,7 +132,7 @@ services:
         EOF
         exec /main --config /tmp/config.json
     ports:
-      # 3020 è il web di Karakeep, 3030-3033 i server MCP Google.
+      # 3020 è il web di Karakeep, 3030-3033 e 3035 i server MCP Google.
       - 3021:9090
     depends_on:
       - web
