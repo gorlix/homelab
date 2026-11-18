@@ -104,6 +104,23 @@
   become: true
   gather_facts: false
   tasks:
+    # -e '{"services":[...]}' vince sulla lista per-host dell'inventory, per
+    # ogni host del --limit: con due host insieme, ognuno riceve tutti i servizi
+    # elencati. Il 17/11/2026 così lo stack traefik (con il suo cloudflared) è
+    # partito anche su Docker-100, il tunnel Gorla ha avuto due connettori e le
+    # richieste passate da quello sbagliato sono state scartate dal firewall di
+    # Rakazo-118/Maus-117 (HOME-59). La lista a mano resta permessa, perché
+    # serve per un servizio non ancora nell'inventory, ma solo su un host per volta.
+    - name: Con una lista services passata a mano, deploy su un solo host
+      ansible.builtin.assert:
+        that: services == inventory_services or ansible_play_hosts_all | length == 1
+        fail_msg: >-
+          services passato con -e su {{ ansible_play_hosts_all | length }} host:
+          ognuno riceverebbe {{ services }}. Lancia run.sh un host alla volta.
+        quiet: true
+      vars:
+        inventory_services: "{{ (lookup('ansible.builtin.file', inventory_file) | from_yaml).all.children.docker_nodes.hosts[inventory_hostname].services | default([]) }}"
+
     # Rete condivisa che Traefik e cloudflared usano per parlarsi (stesso host).
     # community.docker non è installata (nessun altro punto del repo ne ha ancora
     # bisogno): un comando diretto con failed_when tollerante evita di aggiungere
