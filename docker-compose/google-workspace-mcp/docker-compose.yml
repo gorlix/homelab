@@ -1,5 +1,5 @@
 # Server MCP Google Workspace (taylorwilsdon/google_workspace_mcp) per Rakazo:
-# un container per servizio Google (Gmail, Calendar, Drive, Tasks), stessa
+# un container per servizio Google (Gmail, Calendar, Drive, Tasks, Contatti), stessa
 # immagine e stesso client OAuth, ognuno con hostname e token propri.
 #
 # Perché un container per servizio e non uno solo con tutto: in Rakazo la posta
@@ -24,7 +24,7 @@
 # Google, e il server sostituisce l'email passata dal bot con quella del token
 # (auth/service_decorator.py upstream).
 
-# Configurazione comune ai quattro servizi. Per ognuno cambiano solo hostname,
+# Configurazione comune ai cinque servizi. Per ognuno cambiano solo hostname,
 # permessi, volume e porta.
 x-mcp: &mcp
   image: ghcr.io/taylorwilsdon/google_workspace_mcp:2.4.2
@@ -113,8 +113,27 @@ services:
     ports:
       - 3033:8000
 
+  contacts:
+    <<: *mcp
+    environment:
+      <<: *mcp-env
+      WORKSPACE_EXTERNAL_URL: https://mcp-contacts.alessandrogorla.it
+      WORKSPACE_MCP_ALLOWED_HOSTS: mcp-contacts.alessandrogorla.it
+      # "full": il bot Carlo cerca, crea e modifica contatti (scelta di Ale).
+      # Scope Google "contacts"; con "readonly" sarebbe contacts.readonly.
+      # Cambiare livello cambia gli scope: va rifatto il Connect.
+      # Servizio a parte rispetto a gmail (che ha già contacts:readonly): la
+      # voce Rakazo di gmail darebbe a Carlo anche la posta.
+      WORKSPACE_MCP_PERMISSIONS: contacts:full
+    volumes:
+      - contacts_creds:/app/store_creds
+    ports:
+      # 3034 è carlo-vault.
+      - 3035:8000
+
 volumes:
   gmail_creds:
   calendar_creds:
   drive_creds:
   tasks_creds:
+  contacts_creds:
