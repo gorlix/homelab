@@ -234,6 +234,7 @@ Ogni scelta non banale è documentata nel formato *Contesto → Decisione → Co
 - [ADR-011](docs/adr/011-minder-130-runner-staging.md) — `Minder-130`: LXC dedicata per il runner di staging di project_minder, esposta via Cloudflare Tunnel invece che con porte in ingresso
 - [ADR-012](docs/adr/012-openmausbot.md) — OpenMausBot su LXC dedicata `Maus-117` chiusa dal firewall Proxmox
 - [ADR-013](docs/adr/013-rakazo.md) — Rakazo su LXC dedicata `Rakazo-118`, disco fuori dal thin pool
+- [ADR-014](docs/adr/014-lxc-ospite.md) — LXC ospite isolata concessa a una persona esterna
 
 Decisioni già prese ma non ancora scritte per esteso (in programmazione):
 
