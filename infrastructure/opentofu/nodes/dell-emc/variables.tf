@@ -280,3 +280,21 @@ variable "containers" {
     # }
   }
 }
+
+# LXC ospiti (guest.tf, ADR-014). Default vuoto apposta: i valori reali (nome
+# utente e chiave pubblica di una persona esterna) non vanno nel repo pubblico,
+# li passa guest.auto.tfvars su pve-management (vedi guest.auto.tfvars.example).
+variable "guest_containers" {
+  description = "LXC concesse a persone esterne, chiave = hostname"
+  type = map(object({
+    vmid          = number
+    ip            = string # CIDR, es. 192.168.10.121/24
+    cores         = number
+    memory        = number # MB
+    disk_size     = number # GB
+    username      = string
+    ssh_keys      = list(string) # chiavi pubbliche dell'ospite (utente con sudo)
+    root_ssh_keys = list(string) # chiavi pubbliche di root: solo pve-management
+  }))
+  default = {}
+}

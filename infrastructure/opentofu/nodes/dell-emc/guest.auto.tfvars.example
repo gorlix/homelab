@@ -1,0 +1,14 @@
+# Copiare in guest.auto.tfvars su pve-management (ignorato da git).
+# Solo chiavi PUBBLICHE: la privata dell'ospite resta a lui.
+guest_containers = {
+  "guest-121" = {
+    vmid          = 121
+    ip            = "192.168.10.121/24"
+    cores         = 2
+    memory        = 4096
+    disk_size     = 40
+    username      = "nomeutente"
+    ssh_keys      = ["ssh-ed25519 AAAA... ospite"]
+    root_ssh_keys = ["ssh-ed25519 AAAA... root@Management"]
+  }
+}

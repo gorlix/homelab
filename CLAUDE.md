@@ -46,6 +46,7 @@ Tutti e 3 su **Proxmox VE**.
 - Runner GitHub Actions self-hosted + staging di `project_minder` — su LXC dedicata `Minder-130`, stesso schema di isolamento di `Paca-120`; unità creata ma runner e stack non ancora installati (vedi ADR-011)
 - OpenMausBot (harness self-hosted che fa girare agenti AI come bot in una chat, con shell reale) — su LXC dedicata `Maus-117` (`192.168.10.117`), pubblico come `maus.alessandrogorla.it` via Cloudflare Tunnel `Gorla` → Traefik-110 → `192.168.10.117:8080` (Caddy), auth = pairing del server (niente Authentik forward-auth); prima unità chiusa dal firewall Proxmox (`firewall.tf`: ingresso solo da Traefik-110 e SSH da `pve-management`, niente reti private in uscita, richiede firewall datacenter attivo), backup notturno best-effort su `pve` fuori dalla LXC (stessi limiti di PACA/Karakeep: non 3-2-1, contiene token degli engine), niente automerge Renovate (pre-1.0) (vedi ADR-012)
 - Rakazo (bot in chat con un "computer" Docker per bot: desktop + Chromium guidati dall'agente) — su LXC dedicata `Rakazo-118` (`192.168.10.118`), disco su `Storage` (LVM thick) e non sul thin pool, pubblico come `rakazo.alessandrogorla.it` via Cloudflare Tunnel `Gorla` → Traefik-110 → `192.168.10.118:5173`, stesso firewall Proxmox di `Maus-117`, egress dei computer `restricted`, signup chiuso (account con `bootstrap-owner`), segreti su Infisical `prod/rakazo` (`ENCRYPTION_KEY` anche su 1Password), backup notturno su `pve` (non 3-2-1), niente automerge Renovate (pre-1.0) (vedi ADR-013)
+- LXC ospite (vmid 121, `192.168.10.121`, `guest.tf`, fuori da `var.containers` e da Ansible) concessa a una persona esterna con sudo, Docker, Tailscale e Cloudflare Tunnel suoi: unprivileged, kernel condiviso con `pve` come rischio accettato; firewall Proxmox (in ingresso solo SSH da `pve-management`, in uscita nessuna rete privata); nome utente e chiavi in `guest.auto.tfvars` su `pve-management`, fuori da git; niente backup, a carico dell'ospite; revoca con `pct stop`, oppure togliendo la voce e facendo `apply` (vedi ADR-014)
 - Nodi Kubernetes (work in progress)
 - Traefik (reverse proxy della Region B)
 - Cloudflare Tunnel (ad-hoc per la Region B)
@@ -113,6 +114,7 @@ homelab/
 - **ADR-011** — `Minder-130`, LXC dedicata per il runner di staging di project_minder, esposta via Cloudflare Tunnel
 - **ADR-012** — OpenMausBot su LXC dedicata `Maus-117` chiusa dal firewall Proxmox
 - **ADR-013** — Rakazo su LXC dedicata `Rakazo-118`, disco fuori dal thin pool, firewall condiviso con `Maus-117`
+- **ADR-014** — LXC ospite isolata (vmid 121) concessa a una persona esterna: firewall Proxmox, kernel condiviso come rischio accettato, dati dell'ospite fuori dal repo
 
 ## ADR ancora da scrivere (menzionati nel README come placeholder)
 
