@@ -37,9 +37,11 @@ x-mcp-env: &mcp-env
   # In OAuth 2.1 l'immagine ascolta già su 0.0.0.0, lo scrivo per chiarezza.
   WORKSPACE_MCP_HOST: 0.0.0.0
   # Chiunque su Internet può fare la registrazione dinamica del client:
-  # con questa allowlist l'unico redirect accettato è quello di Rakazo,
-  # quindi solo Rakazo può completare un login.
-  WORKSPACE_MCP_ALLOWED_CLIENT_REDIRECT_URIS: https://rakazo.alessandrogorla.it/mcp/oauth/callback
+  # con questa allowlist (separata da virgole) i redirect accettati sono
+  # solo quelli di Rakazo e di OpenMausBot (Maus-117, ADR-012), quindi solo
+  # loro possono completare un login. Quello di Rakazo va tolto quando
+  # Rakazo viene dismesso.
+  WORKSPACE_MCP_ALLOWED_CLIENT_REDIRECT_URIS: https://rakazo.alessandrogorla.it/mcp/oauth/callback,https://maus.alessandrogorla.it/mcp-oauth/callback
   # Fa scegliere l'account Google a ogni Connect: senza, Google riusa
   # l'ultimo account del browser e le voci finirebbero sulla stessa casella.
   WORKSPACE_MCP_OAUTH_PROXY_GOOGLE_PROMPT: select_account consent
