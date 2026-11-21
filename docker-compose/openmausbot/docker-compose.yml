@@ -118,7 +118,14 @@ services:
         # Ogni database SQLite della HOME (stato del server, ma anche quelli
         # degli engine, es. ~/.codex), con il suo path relativo a /data: la
         # struttura interna cambia tra le versioni.
-        for db in $$(find /data -type f \( -name '*.db' -o -name '*.sqlite' \) 2>/dev/null); do
+        # Una riga per file, non `for db in $$(find ...)`: i profili Chrome dei
+        # bot hanno cartelle con spazi ("Code Cache") che spezzavano il path
+        # e facevano fallire ogni backup dal 22/10/2026. Gli stessi profili
+        # hanno file *.db che non sono SQLite (cache V8): si salta tutto ciò
+        # che non inizia con l'header SQLite.
+        find /data -type f \( -name '*.db' -o -name '*.sqlite' \) 2>/dev/null > "$${stage}.dblist"
+        while IFS= read -r db; do
+          [ "$$(head -c 15 "$$db" 2>/dev/null)" = "SQLite format 3" ] || continue
           rel="$${db#/data/}"
           mkdir -p "$$stage/sqlite/$$(dirname "$$rel")"
           if ! sqlite3 "$$db" ".backup '$$stage/sqlite/$$rel'" \
@@ -126,7 +133,8 @@ services:
             echo "Backup failed on $$rel" >&2
             ok=0
           fi
-        done
+        done < "$${stage}.dblist"
+        rm -f "$${stage}.dblist"
         # Il resto della HOME, senza i file SQLite live (già copiati sopra),
         # senza cache ricostruibili e senza .openmausbot/tools: il runtime
         # Antigravity (circa 1.9 GB) che OpenMausBot riscarica dalla UI.
