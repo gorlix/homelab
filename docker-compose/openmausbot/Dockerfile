@@ -42,6 +42,25 @@ RUN mkdir -p /opt/cursor-agent \
   && ln -s /opt/cursor-agent/cursor-agent /usr/local/bin/cursor-agent \
   && cursor-agent --version
 
+# Client Docker e SSH per i "Self-hosted VPS computers" (desktop dei bot,
+# HOME-61, ADR-012): OpenMausBot lancia `docker -H ssh://<alias> ...` e un
+# tunnel `ssh -L` verso il noVNC del desktop. Il daemon NON è qui: è quello
+# dell'LXC, raggiunto via SSH come utente omb-docker (ruolo Ansible
+# omb_vps_host). Solo la CLI, niente engine né docker.sock nel container.
+# Versione fissata a mano: Renovate non legge il repo apt di Docker, si
+# aggiorna guardando
+# https://download.docker.com/linux/debian/dists/bookworm/stable/binary-amd64/Packages
+ARG DOCKER_CLI_VERSION=5:29.10.0-1~debian.12~bookworm
+RUN install -d -m 0755 /etc/apt/keyrings \
+  && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
+  && echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable" \
+     > /etc/apt/sources.list.d/docker.list \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends \
+       "docker-ce-cli=${DOCKER_CLI_VERSION}" openssh-client \
+  && rm -rf /var/lib/apt/lists/* \
+  && docker --version && ssh -V
+
 # Antigravity non si installa qui: OpenMausBot scarica da solo il runtime
 # ufficiale Google (circa 1.9 GB, SHA-256 verificato) dalla UI, in
 # /data/.openmausbot/tools/. Escluso dal backup (docker-compose.yml).

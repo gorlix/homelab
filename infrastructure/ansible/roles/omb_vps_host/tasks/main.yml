@@ -1,0 +1,129 @@
+---
+# Host Docker per i "Self-hosted VPS computers" di OpenMausBot (HOME-61,
+# ADR-012): il container omb comanda il daemon Docker di questa stessa LXC via
+# SSH, come utente omb-docker. Gira dopo il compose up di openmausbot (serve il
+# container omb acceso per generare la chiave nel suo volume).
+#
+# Chi ha la chiave è root sull'LXC (gruppo docker): i vincoli qui sotto
+# tolgono shell e forward arbitrari, non quel privilegio.
+
+- name: Utente omb-docker, nel gruppo docker
+  ansible.builtin.user:
+    name: omb-docker
+    system: true
+    groups: docker
+    append: true
+    # Serve una shell vera: sshd lancia il ForceCommand con `<shell> -c`.
+    shell: /bin/sh
+    create_home: true
+    password_lock: true
+
+- name: Script ForceCommand di omb-docker
+  ansible.builtin.copy:
+    src: omb-docker-gate
+    dest: /usr/local/libexec/omb-docker-gate
+    owner: root
+    group: root
+    mode: '0755'
+
+# Se la config completa non passa `sshd -t`, il drop-in viene tolto: sshd non
+# viene ricaricato e soprattutto non resta una config rotta per il prossimo
+# riavvio (che chiuderebbe fuori anche Management).
+- name: Drop-in sshd per omb-docker
+  block:
+    - name: Copia il drop-in sshd
+      ansible.builtin.copy:
+        src: 90-omb-docker.conf
+        dest: /etc/ssh/sshd_config.d/90-omb-docker.conf
+        owner: root
+        group: root
+        mode: '0600'
+      register: omb_sshd_dropin
+
+    - name: Verifica la config completa di sshd
+      ansible.builtin.command: /usr/sbin/sshd -t
+      changed_when: false
+  rescue:
+    - name: Config sshd non valida, rimuovi il drop-in
+      ansible.builtin.file:
+        path: /etc/ssh/sshd_config.d/90-omb-docker.conf
+        state: absent
+
+    - name: Fallisci
+      ansible.builtin.fail:
+        msg: "sshd -t fallito con 90-omb-docker.conf: drop-in rimosso, sshd non toccato."
+
+# reload, non restart: le sessioni aperte (Ansible stesso) restano su.
+- name: Ricarica sshd
+  ansible.builtin.systemd:
+    name: sshd
+    state: reloaded
+  when: omb_sshd_dropin.changed
+
+# La chiave nasce nel volume di omb (HOME=/data dell'utente maus) e la
+# privata non esce mai dal container: qui si legge solo la pubblica.
+- name: Genera la chiave SSH di omb nel suo volume (se manca)
+  ansible.builtin.command:
+    cmd: >-
+      docker compose exec -T omb sh -c
+      'umask 077; mkdir -p /data/.ssh;
+      test -f /data/.ssh/omb-docker && echo present ||
+      ssh-keygen -q -t ed25519 -N "" -C omb-docker@Maus-117 -f /data/.ssh/omb-docker'
+    chdir: /opt/openmausbot
+  register: omb_keygen
+  changed_when: "'present' not in omb_keygen.stdout"
+
+- name: Leggi la chiave pubblica di omb
+  ansible.builtin.command:
+    cmd: docker compose exec -T omb cat /data/.ssh/omb-docker.pub
+    chdir: /opt/openmausbot
+  register: omb_pubkey
+  changed_when: false
+
+# StrictModes di sshd vuole ~/.ssh dell'utente e non scrivibile da altri.
+- name: Directory .ssh di omb-docker
+  ansible.builtin.file:
+    path: /home/omb-docker/.ssh
+    state: directory
+    owner: omb-docker
+    group: omb-docker
+    mode: '0700'
+
+# restrict spegne pty, agent, X11 e forward; port-forwarding riaccende solo i
+# forward (che PermitOpen in sshd limita a *:6901). from: la chiave vale solo
+# dalle reti Docker dell'LXC (omb sta su una rete compose 172.x), non dalla LAN.
+- name: authorized_keys di omb-docker
+  ansible.builtin.copy:
+    dest: /home/omb-docker/.ssh/authorized_keys
+    content: |
+      restrict,port-forwarding,from="172.16.0.0/12" {{ omb_pubkey.stdout | trim }}
+    owner: omb-docker
+    group: omb-docker
+    mode: '0600'
+
+- name: Leggi la chiave host ed25519 di sshd
+  ansible.builtin.slurp:
+    src: /etc/ssh/ssh_host_ed25519_key.pub
+  register: omb_hostkey
+
+# known_hosts e config scritti da qui (stdin di docker compose exec): niente
+# accept-new, omb si fida solo della chiave host vera dell'LXC.
+- name: known_hosts e ssh config di omb
+  ansible.builtin.command:
+    cmd: >-
+      docker compose exec -T omb sh -c
+      'umask 077; cat > /data/.ssh/{{ item.name }}.new &&
+      if cmp -s /data/.ssh/{{ item.name }}.new /data/.ssh/{{ item.name }};
+      then rm /data/.ssh/{{ item.name }}.new; echo unchanged;
+      else mv /data/.ssh/{{ item.name }}.new /data/.ssh/{{ item.name }}; fi'
+    chdir: /opt/openmausbot
+    stdin: "{{ item.content }}"
+  loop:
+    - name: known_hosts_omb
+      content: "host.docker.internal {{ (omb_hostkey.content | b64decode).split()[:2] | join(' ') }}"
+    - name: config
+      content: "{{ lookup('ansible.builtin.template', 'ssh_config.j2') }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: omb_sshfiles
+  changed_when: "'unchanged' not in omb_sshfiles.stdout"

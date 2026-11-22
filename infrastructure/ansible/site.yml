@@ -149,3 +149,11 @@
       ansible.builtin.command: bash /opt/rakazo/restrict-computer-egress.sh
       changed_when: false
       when: "'rakazo' in services"
+
+    # Host Docker per i desktop dei bot di OpenMausBot (HOME-61, ADR-012):
+    # utente omb-docker con sshd vincolato, chiave generata nel volume di omb.
+    # Dopo il compose up perché la chiave nasce dentro il container omb.
+    - name: Prepara Maus-117 come host dei desktop di OpenMausBot (se questo host esegue OpenMausBot)
+      ansible.builtin.include_role:
+        name: omb_vps_host
+      when: "'openmausbot' in services"

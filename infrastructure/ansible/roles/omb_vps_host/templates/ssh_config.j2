@@ -1,0 +1,9 @@
+# Gestito da Ansible (ruolo omb_vps_host): sovrascritto a ogni deploy.
+# Alias da inserire in OpenMausBot, Settings > API keys > VPS SSH alias.
+Host {{ omb_vps_alias }}
+    HostName host.docker.internal
+    User omb-docker
+    IdentityFile /data/.ssh/omb-docker
+    IdentitiesOnly yes
+    UserKnownHostsFile /data/.ssh/known_hosts_omb
+    StrictHostKeyChecking yes

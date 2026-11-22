@@ -1,0 +1,5 @@
+---
+# Alias SSH che OpenMausBot usa per il daemon Docker (Settings > API keys >
+# VPS SSH alias). Deve essere un nome semplice: upstream accetta solo
+# [A-Za-z0-9][A-Za-z0-9_.-]* (server/config.ts).
+omb_vps_alias: maus-docker

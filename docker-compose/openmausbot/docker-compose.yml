@@ -33,6 +33,11 @@ services:
       # LXC perché Traefik-110 la deve raggiungere. Il firewall Proxmox la apre
       # solo a 192.168.10.110. Il server stesso (8799/8800) resta su loopback.
       - "192.168.10.117:8080:80"
+    # Nome con cui omb raggiunge sshd dell'LXC per i desktop dei bot (HOME-61):
+    # host-gateway = IP di docker0 sull'LXC (172.17.0.1). Lo usa l'alias SSH in
+    # /data/.ssh/config, scritto dal ruolo Ansible omb_vps_host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       OMB_PORT: "8799"
       OMB_WEBHOOK_PORT: "8800"
@@ -46,12 +51,16 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
-    # Tetti per non far soffocare la LXC a un bot che apre troppi browser:
-    # lasciano spazio a Docker, Caddy e al backup dentro i 4 GB della LXC.
+    # Tetti per non far soffocare la LXC a un bot che apre troppi browser.
+    # Valgono solo per questo container: i desktop dei bot (HOME-61) sono
+    # container a parte, con il loro limite (4 GB e 2 CPU ciascuno, deciso da
+    # OpenMausBot). Con 12 GB di LXC: omb 3 + due desktop 8 + il resto.
     mem_limit: 3g
     pids_limit: 1024
-    # Nessun /var/run/docker.sock e nessun mount di /opt: una shell di un bot
-    # resta dentro questo container.
+    # Nessun /var/run/docker.sock e nessun mount di /opt. Ma dal 22/11/2026
+    # (HOME-61) da qui si raggiunge il daemon Docker dell'LXC via SSH come
+    # omb-docker, cioè root sull'LXC: una shell di un bot non resta più dentro
+    # questo container (ADR-012, "Da tenere presente").
 
   # Condivide il network namespace di omb: se omb viene ricreato, va ricreato
   # anche caddy. `docker compose up -d` dell'intero stack lo fa da solo; dopo
