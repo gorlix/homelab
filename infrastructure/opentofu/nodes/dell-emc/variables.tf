@@ -103,7 +103,7 @@ variable "containers" {
       cores     = 4
       memory    = 8192
       disk_size = 50
-      services  = ["linkwarden", "monitoring", "karakeep", "google-workspace-mcp", "carlo-vault", "chatterbox-tts"]
+      services  = ["linkwarden", "monitoring", "karakeep", "google-workspace-mcp", "carlo-vault", "kokoro-tts"]
       # Backup di Karakeep (servizio `backup` nel suo compose). Docker-100
       # esisteva già: il mount è stato aggiunto a mano con `pct set` il
       # 09/10/2026, il local-exec in main.tf gira solo alla creazione.

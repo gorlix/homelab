@@ -1,0 +1,39 @@
+# Server TTS Kokoro (hexgrad, 82M parametri) con API compatibile OpenAI, come
+# voce dei bot di OpenMausBot su Maus-117 (ADR-012). Gira su CPU, su Docker-100
+# (192.168.10.100), accanto ai server MCP.
+#
+# Sostituisce la prova con Chatterbox multilingual: su queste 4 CPU sintetizzava
+# 20-36 volte più lento del tempo reale (3,5 s di audio in 126 s), inutilizzabile
+# in chiamata. Docker-100 non ha GPU. Kokoro è molto più piccolo e su CPU va
+# sopra il tempo reale; ha voci italiane (if_sara, im_nicola), ma niente
+# clonazione della voce.
+#
+# Server: remsky/Kokoro-FastAPI, immagine ufficiale CPU con il modello già
+# dentro (niente download al primo avvio). Versione fissata: Renovate propone
+# gli aggiornamenti.
+#
+# L'endpoint è POST /v1/audio/speech (OpenAI). La lingua si sceglie dal prefisso
+# della voce (i* = italiano), quindi in OMB come voce serve if_sara o im_nicola.
+#
+# Nessuna autenticazione: il server non ne ha. NON va esposto su Internet né da
+# Traefik/Cloudflare. Raggiungibile dalla LAN su :3036; Maus-117 lo vede grazie
+# a una regola dedicata del suo firewall (firewall.tf).
+#
+# Nessun segreto: niente .env, niente Infisical.
+services:
+  tts:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:v0.10.0
+    restart: unless-stopped
+    ports:
+      # 3030-3035 sono i server MCP, 3020-3021 Karakeep.
+      - 3036:8880
+    # Docker-100 ha 4 core e 8 GB condivisi con Karakeep, Linkwarden, Monitoring
+    # e i server MCP. Il tetto evita che la sintesi li affami.
+    cpus: 3
+    mem_limit: 3g
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8880/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
