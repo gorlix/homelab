@@ -219,8 +219,13 @@ variable "containers" {
       vmid             = 117
       ip               = "192.168.10.117/24"
       gateway          = "192.168.10.254"
-      cores            = 2
-      memory           = 4096
+      # 4/12288 dal 22/11/2026 (HOME-61): l'LXC fa anche da host Docker per i
+      # desktop dei bot di OpenMausBot, 4 GB e 2 CPU ciascuno (limiti decisi
+      # upstream), più omb (mem_limit 3g). Prima 2/4096. Disco fermo a 30: il
+      # thin pool local-lvm era all'89%, l'immagine base dei desktop è circa
+      # 2 GB e la build cache Docker si può svuotare (ADR-012).
+      cores            = 4
+      memory           = 12288
       disk_size        = 30
       services         = ["openmausbot"]
       backup_host_path = "/var/lib/pve-persistent/openmausbot-backups"

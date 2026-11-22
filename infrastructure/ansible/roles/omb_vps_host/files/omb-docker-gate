@@ -1,0 +1,18 @@
+#!/bin/sh
+# ForceCommand dell'utente omb-docker (ruolo omb_vps_host, HOME-61, ADR-012).
+# OpenMausBot via SSH lancia solo due comandi:
+# - `docker system dial-stdio`: il trasporto di `docker -H ssh://alias`;
+# - `true`: apre la connessione master condivisa (vps-ssh.ts upstream).
+# Il tunnel del desktop (`ssh -N -L`) non esegue comandi e non passa da qui:
+# lo limita PermitOpen nel drop-in di sshd.
+# Non riduce i privilegi (il daemon Docker resta root sull'LXC): toglie la
+# shell interattiva, così chi ha la chiave deve passare dall'API Docker.
+case "$SSH_ORIGINAL_COMMAND" in
+  "docker system dial-stdio") exec docker system dial-stdio ;;
+  "true") exit 0 ;;
+  *)
+    logger -t omb-docker-gate "comando rifiutato: $SSH_ORIGINAL_COMMAND"
+    echo "omb-docker-gate: comando non permesso" >&2
+    exit 1
+    ;;
+esac
