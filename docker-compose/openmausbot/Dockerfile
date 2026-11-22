@@ -9,16 +9,16 @@
 #
 # Il tag di FROM lo aggiorna Renovate (manager dockerfile, regola senza
 # automerge in renovate.json: pre-1.0, rilasci quotidiani).
-FROM ghcr.io/milind-soni/openmausbot:v0.1.120
+FROM ghcr.io/milind-soni/openmausbot:v0.1.176
 
 USER root
 
 # renovate: datasource=npm depName=@anthropic-ai/claude-code
-ARG CLAUDE_CODE_VERSION=2.1.306
+ARG CLAUDE_CODE_VERSION=2.1.330
 # renovate: datasource=npm depName=@openai/codex
-ARG CODEX_VERSION=0.163.0
+ARG CODEX_VERSION=0.171.0
 # renovate: datasource=npm depName=opencode-ai
-ARG OPENCODE_VERSION=1.19.3
+ARG OPENCODE_VERSION=1.19.6
 
 # HOME temporanea: le cache npm della build non devono finire nell'immagine
 # né, soprattutto, nel volume /data (che è la HOME di maus a runtime).
