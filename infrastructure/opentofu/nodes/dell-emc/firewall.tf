@@ -128,6 +128,22 @@ resource "proxmox_virtual_environment_firewall_rules" "isolated" {
     }
   }
 
+  # Eccezione solo per Maus-117: il server TTS Chatterbox su Docker-100 (voce
+  # dei bot, stack chatterbox-tts). Solo quella porta: il server non ha
+  # autenticazione e non si apre il resto di Docker-100. Conseguenza: anche una
+  # shell dei bot può chiamarlo (può solo sintetizzare voce, consumando CPU).
+  dynamic "rule" {
+    for_each = each.key == "Maus-117" ? [1] : []
+    content {
+      type    = "out"
+      action  = "ACCEPT"
+      comment = "TTS Chatterbox su Docker-100"
+      dest    = "192.168.10.100"
+      proto   = "tcp"
+      dport   = "3036"
+    }
+  }
+
   # Tutto il resto verso reti private è bloccato: LAN di casa e della ditta
   # (192.168.0.0/16 copre anche 192.168.10.0/24), altri RFC1918, CGNAT di
   # Tailscale/Netbird, link-local. Quello che non è qui esce verso Internet
