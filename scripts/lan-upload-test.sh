@@ -29,7 +29,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "$T/dyn" "$T/certs" "$T/consume/rakazo"
+mkdir -p "$T/dyn" "$T/certs" "$T/consume/rakazo" "$T/consume/omb"
 cp "$SRC"/dynamic/*.yml "$T/dyn/"
 openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 1 \
   -subj "/CN=lan-upload-test" -keyout "$T/key.pem" -out "$T/certs/lan-upload.crt" 2>/dev/null
@@ -41,11 +41,12 @@ docker run -d --rm --name lanup-webdav --network home53lt --user "$(id -u):$(id 
 # Nel test il backend è il container rclone e il client è sulla rete Docker:
 # cambiano solo URL del servizio e IP consentito, il resto è il file reale.
 SUB=$(docker network inspect home53lt -f '{{(index .IPAM.Config 0).Subnet}}')
-sed -i "s#http://192.168.10.119:8020#http://lanup-webdav:8020#; s#192.168.10.118/32#$SUB#" "$T/dyn/lan-upload.yml"
+sed -i "s#http://192.168.10.119:8020#http://lanup-webdav:8020#; s#192.168.10.118/32#$SUB#; s#192.168.10.117/32#$SUB#" "$T/dyn/lan-upload.yml"
 
 docker run -d --rm --name lanup-traefik --network home53lt \
   -e LAN_UPLOAD_TLS_KEY_B64="$(base64 -w0 "$T/key.pem")" \
   -e LAN_UPLOAD_RAKAZO_HTPASSWD="rakazo:$(openssl passwd -apr1 "$TEST_PW")" \
+  -e LAN_UPLOAD_OMB_HTPASSWD="omb:$(openssl passwd -apr1 "$TEST_PW")" \
   -v "$T/dyn:/etc/traefik/dynamic:ro" -v "$T/certs:/etc/traefik/certs:ro" "$TRAEFIK_IMAGE" \
   --providers.file.directory=/etc/traefik/dynamic --entrypoints.web.address=:80 \
   --entrypoints.lan-upload.address=:8099 --entrypoints.lan-upload.http.tls=true \
@@ -88,6 +89,9 @@ check "PUT fuori dalla cartella (%2e)" 404 "$(code -u "rakazo:$TEST_PW" -T /w/do
 check "GET di un file caricato"      404 "$(code -u "rakazo:$TEST_PW" "$URL/rakazo/doc.txt")"
 check "PROPFIND (elenco)"            404 "$(code -u "rakazo:$TEST_PW" -X PROPFIND "$URL/rakazo/")"
 check "DELETE"                       404 "$(code -u "rakazo:$TEST_PW" -X DELETE "$URL/rakazo/doc.txt")"
+check "PUT omb nella propria cartella" 201 "$(code -u "omb:$TEST_PW" -T /w/doc.txt "$URL/omb/doc.txt")"
+check "PUT omb nella cartella di rakazo" 401 "$(code -u "omb:$TEST_PW" -T /w/doc.txt "$URL/rakazo/y.txt")"
+check "PUT rakazo nella cartella di omb" 401 "$(code -u "rakazo:$TEST_PW" -T /w/doc.txt "$URL/omb/y.txt")"
 check "file arrivato in consume/rakazo" yes "$([ -f "$T/consume/rakazo/doc.txt" ] && echo yes || echo no)"
 
 [ "$fail" = 0 ] && echo "Tutti i controlli passati." || { echo "Qualche controllo è fallito."; exit 1; }

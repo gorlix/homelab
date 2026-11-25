@@ -33,6 +33,18 @@ http:
       service: paperless-webdav
       tls: {}
 
+    # OpenMausBot su Maus-117 (dal 25/11/2026, HOME-54). I bot girano nel
+    # container openmausbot-omb-1 ed escono con l'IP della LXC.
+    lan-upload-omb:
+      rule: "PathPrefix(`/omb/`) && Method(`PUT`)"
+      entryPoints:
+        - lan-upload
+      middlewares:
+        - lan-upload-omb-ip
+        - lan-upload-omb-auth
+      service: paperless-webdav
+      tls: {}
+
   middlewares:
     lan-upload-rakazo-ip:
       ipAllowList:
@@ -42,6 +54,15 @@ http:
       basicAuth:
         users:
           - '{{ env "LAN_UPLOAD_RAKAZO_HTPASSWD" }}'
+        removeHeader: true
+    lan-upload-omb-ip:
+      ipAllowList:
+        sourceRange:
+          - "192.168.10.117/32"
+    lan-upload-omb-auth:
+      basicAuth:
+        users:
+          - '{{ env "LAN_UPLOAD_OMB_HTPASSWD" }}'
         removeHeader: true
 
   services:
