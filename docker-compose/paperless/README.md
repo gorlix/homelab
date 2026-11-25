@@ -98,7 +98,14 @@ Per regolare i poteri (variabili in Infisical, poi nuovo deploy):
 
 ## Cartella consume in LAN (lan-upload)
 
-Permette a un client della rete locale di caricare file nella cartella `consume` di Paperless, che li acquisisce da sola. Oggi l'unico client è `Rakazo-118`: i suoi bot devono solo **caricare** file (leggere e cercare lo fanno già col server MCP).
+Permette a un client della rete locale di caricare file nella cartella `consume` di Paperless, che li acquisisce da sola. I client sono due, entrambi di bot che devono solo **caricare** file (leggere e cercare lo fanno già col server MCP):
+
+| Client | Da dove | Cartella e tag | Password in chiaro | Hash per Traefik |
+|---|---|---|---|---|
+| `rakazo` | `Rakazo-118` (192.168.10.118) | `consume/rakazo/`, tag `rakazo` | Infisical `prod/rakazo`, `PAPERLESS_UPLOAD_PASSWORD` | `LAN_UPLOAD_RAKAZO_HTPASSWD` |
+| `omb` (dal 25/11/2026) | `Maus-117`, OpenMausBot (192.168.10.117) | `consume/omb/`, tag `omb` | Infisical `prod/openmausbot`, `PAPERLESS_UPLOAD_PASSWORD` | `LAN_UPLOAD_OMB_HTPASSWD` |
+
+Ogni client ha credenziali, IP e cartella propri: le credenziali di uno non valgono nella cartella dell'altro (lo controlla `scripts/lan-upload-test.sh`).
 
 Requisiti decisi con l'autore (14/11/2026): solo rete locale `192.168.10.0/24`, niente Internet né Cloudflare Tunnel; un solo punto di gestione degli accessi, `Traefik-110`; un client alla volta, aggiungerne altri deve essere una modifica piccola.
 
@@ -138,9 +145,9 @@ Il router di ogni client (`traefik/dynamic/lan-upload.yml`) li applica tutti e t
 
 La sottocartella `consume/<client>/` diventa un tag in Paperless (per Rakazo il tag `rakazo`). Serve per sapere da dove arriva un documento, utile perché i bot maneggiano contenuti non fidati.
 
-### Come carica Rakazo
+### Come carica un bot
 
-La password in chiaro è su Infisical `prod/rakazo` come `PAPERLESS_UPLOAD_PASSWORD`. Il certificato è self-signed: i client lo verificano con quello pubblico del repo (`docker-compose/traefik/certs/lan-upload.crt`).
+La password in chiaro sta su Infisical (tabella sopra) e va messa a mano nell'ambiente del bot come `PAPERLESS_UPLOAD_PASSWORD`. Per OMB l'esempio qui sotto vale cambiando utente e cartella in `omb`. Il certificato è self-signed: i client lo verificano con quello pubblico del repo (`docker-compose/traefik/certs/lan-upload.crt`).
 
 ```bash
 curl --cacert lan-upload.crt \

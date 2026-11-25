@@ -66,6 +66,7 @@ services:
     environment:
       LAN_UPLOAD_TLS_KEY_B64: ${LAN_UPLOAD_TLS_KEY_B64:?manca su Infisical prod/traefik}
       LAN_UPLOAD_RAKAZO_HTPASSWD: ${LAN_UPLOAD_RAKAZO_HTPASSWD:?manca su Infisical prod/traefik}
+      LAN_UPLOAD_OMB_HTPASSWD: ${LAN_UPLOAD_OMB_HTPASSWD:?manca su Infisical prod/traefik}
     networks:
       - traefik_proxy
 

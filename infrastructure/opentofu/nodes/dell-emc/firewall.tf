@@ -112,12 +112,12 @@ resource "proxmox_virtual_environment_firewall_rules" "isolated" {
     dport   = "53"
   }
 
-  # Unica eccezione al blocco qui sotto, solo per Rakazo-118: l'entrypoint
-  # lan-upload di Traefik-110, da cui i bot caricano file nella cartella
-  # consume di Paperless (HOME-53). Solo la 8099: le route pubbliche su :80
-  # restano irraggiungibili dalla LAN dei bot.
+  # Eccezione al blocco qui sotto per le LXC dei bot: l'entrypoint lan-upload
+  # di Traefik-110, da cui i bot caricano file nella cartella consume di
+  # Paperless (HOME-53; Maus-117 dal 25/11/2026, client "omb", HOME-54). Solo
+  # la 8099: le route pubbliche su :80 restano irraggiungibili dalla LAN dei bot.
   dynamic "rule" {
-    for_each = each.key == "Rakazo-118" ? [1] : []
+    for_each = contains(["Rakazo-118", "Maus-117"], each.key) ? [1] : []
     content {
       type    = "out"
       action  = "ACCEPT"
