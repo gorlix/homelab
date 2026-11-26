@@ -24,8 +24,21 @@
 # default, non aggiunte qui perché non usate. Nessuna variabile esistente
 # rinominata o rimossa.
 #
+# Bump v0.20.1 -> v0.22.0 (26/11/2026, HOME-69): il repo diceva già 0.21.0
+# (PR Renovate #89-93), ma quel bump non era mai stato deployato, quindi su
+# Paca-120 il salto reale è stato da 0.20.1. Compose e Caddyfile upstream
+# aggiungono solo PLUGINS_STORE (opzionale, default "local", non aggiunto
+# qui). Migrazioni DB 081-096: l'unica distruttiva è la 096, che sposta
+# doc_folders dentro file_folders e poi elimina la tabella. Provata prima su
+# una copia del DB di produzione: stessi conteggi in tutte le tabelle, le 9
+# cartelle doc migrate, nessun documento con la cartella orfana.
+# AGENT_SERVER_IMAGE resta a 0.14.1, da allineare in un task separato.
+#
 # Schema di migrazione DB: embedded nel binario dell'API, applicato
-# automaticamente ad ogni avvio (SQL idempotente).
+# automaticamente ad ogni avvio. Ogni file gira nella sua transazione e
+# viene registrato in schema_migrations, quindi un errore lascia lo schema
+# com'era. Le migrazioni non si annullano: per tornare a una versione
+# precedente serve il restore del dump fatto prima dell'upgrade.
 
 name: paca
 
@@ -143,7 +156,7 @@ services:
 
   # API (Go backend)
   api:
-    image: ${PACA_API_IMAGE:-pacaai/paca-api:0.21.0}
+    image: ${PACA_API_IMAGE:-pacaai/paca-api:0.22.0}
     restart: unless-stopped
     environment:
       ENV: ${ENVIRONMENT:-production}
@@ -199,14 +212,14 @@ services:
 
   # Web (React SPA servita da Caddy, immagine dedicata)
   web:
-    image: ${PACA_WEB_IMAGE:-pacaai/paca-web:0.21.0}
+    image: ${PACA_WEB_IMAGE:-pacaai/paca-web:0.22.0}
     restart: unless-stopped
     depends_on:
       - api
 
   # Realtime (Socket.IO)
   realtime:
-    image: ${PACA_REALTIME_IMAGE:-pacaai/paca-realtime:0.21.0}
+    image: ${PACA_REALTIME_IMAGE:-pacaai/paca-realtime:0.22.0}
     restart: unless-stopped
     environment:
       PORT: 3001
@@ -253,7 +266,7 @@ services:
   # una LXC dedicata (Paca-120) e non condivide host con altri servizi, vedi
   # commento in testa al file e infrastructure/opentofu/nodes/dell-emc/variables.tf.
   agent-runner:
-    image: ${PACA_AGENT_RUNNER_IMAGE:-pacaai/paca-agent-runner:0.21.0}
+    image: ${PACA_AGENT_RUNNER_IMAGE:-pacaai/paca-agent-runner:0.22.0}
     restart: unless-stopped
     environment:
       VALKEY_URL: ${REDIS_URL:-redis://valkey:6379/0}
