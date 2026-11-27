@@ -3,7 +3,7 @@
 # wikilink e frontmatter (chi lavora dove, chi ha presentato chi). Il formato è
 # quello di Obsidian: il vault si apre in Obsidian così com'è.
 #
-# Due servizi sulla stessa cartella ./vault:
+# Tre servizi sulla stessa cartella ./vault:
 # - mcp: il server MCP (mcpvault, stdio) dietro mcp-proxy, che lo espone in
 #   streamable-http con token Bearer. Stesso schema di karakeep/mcp.
 # - git: committa ogni 5 minuti quello che Carlo ha cambiato e fa push su un
@@ -11,6 +11,8 @@
 #   per questo Carlo può anche cancellare) e la copia fuori da Docker-100.
 #   Il commit lo fa il container e non il bot: niente tool git da esporre e
 #   niente "ricordati di committare" nelle istruzioni.
+# - tailscale: condivide il vault in SOLA LETTURA con Ale via Taildrive
+#   (alpha), così lo monta sul PC e lo apre in Obsidian. Vedi il README.
 #
 # .env non presente qui: CARLO_VAULT_MCP_AUTH_TOKEN e CARLO_VAULT_DEPLOY_KEY
 # stanno su Infisical in prod/carlo-vault (ADR-007), il .env lo genera Ansible.
@@ -94,3 +96,37 @@ services:
         done
     volumes:
       - ./vault:/vault
+
+  tailscale:
+    image: tailscale/tailscale:v1.98.10
+    restart: unless-stopped
+    hostname: carlo-vault
+    environment:
+      # Chiave di autenticazione taggata (tag:carlo-vault), non riutilizzabile
+      # e non effimera: serve solo al primo avvio, poi basta lo stato nel volume.
+      TS_AUTHKEY: ${CARLO_VAULT_TS_AUTHKEY:?manca su Infisical prod/carlo-vault}
+      TS_HOSTNAME: carlo-vault
+      TS_STATE_DIR: /var/lib/tailscale
+      # Docker-100 è una LXC: niente /dev/net/tun. La modalità userspace basta
+      # a Taildrive, che non instrada pacchetti ma serve WebDAV dal demone.
+      TS_USERSPACE: "true"
+      TS_SOCKET: /var/run/tailscale/tailscaled.sock
+      TS_EXTRA_ARGS: --advertise-tags=tag:carlo-vault
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        /usr/local/bin/containerboot &
+        # Aspetta che il demone sia connesso, poi (ri)dichiara la condivisione:
+        # il comando è idempotente, e se lo stato fosse perso si ricrea da solo.
+        until tailscale status >/dev/null 2>&1; do sleep 2; done
+        tailscale drive share carlo_vault /vault
+        wait
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      # Prima difesa: anche se le ACL del tailnet sbagliassero, il demone
+      # vede il vault montato in sola lettura e non può scriverci.
+      - ./vault:/vault:ro
+
+volumes:
+  tailscale-state:
